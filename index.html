@@ -4,26 +4,38 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HireWise AI — job posts + resume screening for small business</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<header>
-  <div class="brand">HireWise <span>AI</span></div>
-  <p class="tag">Write job posts that attract great people. Screen applicants in seconds. All local — nothing leaves your browser.</p>
-</header>
 
-<nav class="tabs">
-  <button class="tab active" data-panel="panel-post">Job Post Builder</button>
-  <button class="tab" data-panel="panel-screen">Resume Screener</button>
-  <button class="tab" data-panel="panel-pipe">Pipeline</button>
-</nav>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand"><span class="brand-mark">H</span>HireWise <em>AI</em></div>
+    <nav class="tabs" aria-label="Workspace">
+      <button class="tab active" data-panel="panel-post">Write a post</button>
+      <button class="tab" data-panel="panel-screen">Screen resumes</button>
+      <button class="tab" data-panel="panel-pipe">Pipeline <span id="pipeCount" class="tab-count"></span></button>
+    </nav>
+  </div>
+  <p class="tagline">Write job posts that attract great people. Screen applicants in seconds. All local — nothing leaves your browser.</p>
+</header>
 
 <main>
   <!-- ============ POST BUILDER ============ -->
   <section id="panel-post" class="panel active">
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Job post builder</p>
+        <h1>Describe the role — preview it like a candidate would</h1>
+        <p class="page-sub">Three polished tones, generated from your brief. Copy the one that sounds like you.</p>
+      </div>
+    </div>
     <div class="grid2">
       <div class="formcard">
-        <h2>Describe the role</h2>
+        <h2>The role brief</h2>
         <label>Job title <input id="role" placeholder="e.g. Line Cook"></label>
         <label>Company <input id="company" placeholder="e.g. Sunny Side Diner"></label>
         <label>Location <input id="location" placeholder="e.g. Austin, TX"></label>
@@ -43,9 +55,9 @@
         <button id="genPost" class="primary">Generate job post</button>
       </div>
       <div>
-        <h2>Polished posts — 3 tones</h2>
-        <div id="postOut" class="posts"><p class="hint">Fill in the form and hit generate.</p></div>
-        <h2>Red flags to avoid</h2>
+        <h2 class="col-title">Published preview <span class="col-hint">— as candidates see it</span></h2>
+        <div id="postOut" class="posts"><p class="hint">Fill in the brief and hit generate.</p></div>
+        <h2 class="col-title">Writing check</h2>
         <div id="flagsOut"><p class="hint">We check your post for clichés, vague pay, and risky language.</p></div>
       </div>
     </div>
@@ -53,9 +65,16 @@
 
   <!-- ============ SCREENER ============ -->
   <section id="panel-screen" class="panel">
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Resume screener</p>
+        <h1>Score a candidate in seconds</h1>
+        <p class="page-sub">Paste a resume — get a fit score with evidence, plus interview questions aimed at the gaps.</p>
+      </div>
+    </div>
     <div class="grid2">
       <div class="formcard">
-        <h2>Screen a candidate</h2>
+        <h2>The candidate</h2>
         <label>Candidate name <input id="candName" placeholder="e.g. Maria Santos"></label>
         <label>Role hiring for <input id="sRole" placeholder="e.g. Line Cook"></label>
         <label>Must-haves (one per line)
@@ -73,7 +92,7 @@
         <button id="runScreen" class="primary">Score this resume</button>
       </div>
       <div>
-        <h2>Fit score</h2>
+        <h2 class="col-title">Scorecard</h2>
         <div id="screenOut"><p class="hint">Paste a resume and hit score.</p></div>
       </div>
     </div>
@@ -81,8 +100,12 @@
 
   <!-- ============ PIPELINE ============ -->
   <section id="panel-pipe" class="panel">
-    <div class="pipehead">
-      <h2>Candidate pipeline</h2>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Hiring pipeline</p>
+        <h1>Every candidate, one board</h1>
+        <p class="page-sub">Move candidates through stages with the arrows. Saved in this browser.</p>
+      </div>
       <button id="clearPipe" class="danger">Clear all</button>
     </div>
     <div id="pipeOut" class="pipeline"></div>

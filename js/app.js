@@ -28,11 +28,18 @@
     const d = readPostForm();
     const posts = HW.generatePosts(d);
     const full = Object.values(posts).join("\n");
-    $("postOut").innerHTML = ["professional", "friendly", "bold"].map((tone) =>
-      `<div class="postcard"><div class="postcard-head"><span class="tonetag">${tone}</span>
+    $("postOut").innerHTML = ["professional", "friendly", "bold"].map((tone) => {
+      const coName = (d.company || "").trim() || "Your company";
+      const coInitial = coName.charAt(0).toUpperCase();
+      const coLoc = (d.location || "").trim();
+      return `<div class="postcard tone-${tone}">
+       <div class="postcard-top"><span class="tonetag">${tone}</span>
        <button class="copybtn" data-tone="${tone}">Copy</button></div>
-       <pre>${escapeHtml(posts[tone])}</pre></div>`
-    ).join("");
+       <div class="ad-frame">
+         <div class="ad-company"><span class="ad-logo">${escapeHtml(coInitial)}</span>${escapeHtml(coName)}${coLoc ? " · " + escapeHtml(coLoc) : ""}</div>
+         <pre>${escapeHtml(posts[tone])}</pre>
+       </div></div>`;
+    }).join("");
     document.querySelectorAll(".copybtn").forEach((b) =>
       b.addEventListener("click", () => {
         navigator.clipboard.writeText(posts[b.dataset.tone]).catch(() => {});
@@ -92,16 +99,17 @@
 
   function renderPipe() {
     const p = loadPipe();
+    $("pipeCount").textContent = p.length ? p.length : "";
     $("pipeOut").innerHTML = STAGES.map((st) => {
       const cards = p.map((c, i) => ({ c, i })).filter((x) => x.c.stage === st);
-      return `<div class="column"><h3>${STAGE_LABEL[st]} (${cards.length})</h3>` +
+      return `<div class="column"><h3>${STAGE_LABEL[st]} <span class="count">${cards.length}</span></h3>` +
         cards.map(({ c, i }) =>
           `<div class="card verdict-${c.verdict}">
              <strong>${escapeHtml(c.name)}</strong>
-             <div class="meta">${escapeHtml(c.role)} · ${c.score}/100</div>
+             <div class="meta">${escapeHtml(c.role)}<span class="score-chip">${c.score}</span></div>
              <div class="cardbtns">
-               ${st !== "applied" ? `<button data-mv="${i}|back">←</button>` : ""}
-               ${st !== "offer" ? `<button data-mv="${i}|fwd">→</button>` : `<span class="hired">★</span>`}
+               ${st !== "applied" ? `<button data-mv="${i}|back" aria-label="Move back">←</button>` : ""}
+               ${st !== "offer" ? `<button data-mv="${i}|fwd" aria-label="Move forward">→</button>` : `<span class="hired">★</span>`}
                <button data-del="${i}" class="del">Delete</button>
              </div></div>`
         ).join("") + `</div>`;
