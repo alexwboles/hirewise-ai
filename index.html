@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HireWise AI — job posts + resume screening for small business</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">🤝 HireWise AI</div>
+  <p class="tag">Write job posts that attract great people. Screen applicants in seconds. All local — nothing leaves your browser.</p>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-panel="panel-post">📝 Job Post Builder</button>
+  <button class="tab" data-panel="panel-screen">🔍 Resume Screener</button>
+  <button class="tab" data-panel="panel-pipe">📋 Pipeline</button>
+</nav>
+
+<main>
+  <!-- ============ POST BUILDER ============ -->
+  <section id="panel-post" class="panel active">
+    <div class="grid2">
+      <div class="formcard">
+        <h2>Describe the role</h2>
+        <label>Job title <input id="role" placeholder="e.g. Line Cook"></label>
+        <label>Company <input id="company" placeholder="e.g. Sunny Side Diner"></label>
+        <label>Location <input id="location" placeholder="e.g. Austin, TX"></label>
+        <div class="row">
+          <label>Pay min <input id="payMin" placeholder="18" inputmode="decimal"></label>
+          <label>Pay max <input id="payMax" placeholder="24" inputmode="decimal"></label>
+          <label>Type
+            <select id="payType"><option value="hourly">per hour</option><option value="salary">per year</option></select>
+          </label>
+        </div>
+        <label>Must-haves (one per line)
+          <textarea id="mustHaves" rows="5" placeholder="Food safety certification&#10;2+ years line experience&#10;Weekend availability"></textarea>
+        </label>
+        <label>Nice-to-haves (one per line)
+          <textarea id="niceToHaves" rows="3" placeholder="Grill station experience&#10;Bilingual"></textarea>
+        </label>
+        <button id="genPost" class="primary">Generate job post ✨</button>
+      </div>
+      <div>
+        <h2>Polished posts — 3 tones</h2>
+        <div id="postOut" class="posts"><p class="hint">Fill in the form and hit generate.</p></div>
+        <h2>🚩 Red flags to avoid</h2>
+        <div id="flagsOut"><p class="hint">We check your post for clichés, vague pay, and risky language.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREENER ============ -->
+  <section id="panel-screen" class="panel">
+    <div class="grid2">
+      <div class="formcard">
+        <h2>Screen a candidate</h2>
+        <label>Candidate name <input id="candName" placeholder="e.g. Maria Santos"></label>
+        <label>Role hiring for <input id="sRole" placeholder="e.g. Line Cook"></label>
+        <label>Must-haves (one per line)
+          <textarea id="sMustHaves" rows="4" placeholder="Food safety certification&#10;2+ years experience&#10;Weekend availability"></textarea>
+        </label>
+        <label>Paste resume text
+          <textarea id="resumeText" rows="10" placeholder="Paste the resume here…"></textarea>
+        </label>
+        <div class="samplerow">
+          <span>Try a demo:</span>
+          <button data-sample="0">Strong</button>
+          <button data-sample="1">Maybe</button>
+          <button data-sample="2">Weak</button>
+        </div>
+        <button id="runScreen" class="primary">Score this resume 🔍</button>
+      </div>
+      <div>
+        <h2>Fit score</h2>
+        <div id="screenOut"><p class="hint">Paste a resume and hit score.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PIPELINE ============ -->
+  <section id="panel-pipe" class="panel">
+    <div class="pipehead">
+      <h2>Candidate pipeline</h2>
+      <button id="clearPipe" class="danger">Clear all</button>
+    </div>
+    <div id="pipeOut" class="pipeline"></div>
+  </section>
+</main>
+
+<footer>
+  <p>HireWise AI · free to run · your data never leaves this browser · <a href="README.md">README</a></p>
+</footer>
+
+<script src="js/logic.js"></script>
+<script src="js/samples.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
