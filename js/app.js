@@ -102,7 +102,7 @@
              <div class="cardbtns">
                ${st !== "applied" ? `<button data-mv="${i}|back">←</button>` : ""}
                ${st !== "offer" ? `<button data-mv="${i}|fwd">→</button>` : `<span class="hired">★</span>`}
-               <button data-del="${i}" class="del">✕</button>
+               <button data-del="${i}" class="del">Delete</button>
              </div></div>`
         ).join("") + `</div>`;
     }).join("");
