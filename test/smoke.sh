@@ -59,5 +59,42 @@ if(r.missing.length!==3) process.exit(1);
 grep -q 'panel-post' index.html && grep -q 'panel-screen' index.html && grep -q 'panel-pipe' index.html \
   && ok "index.html has all 3 panels" || bad "index.html missing panels"
 
+# 13: logic exports pipeStats + pipelineToCSV
+node -e "const HW=require('./js/logic.js'); if(!HW.pipeStats||!HW.pipelineToCSV) process.exit(1);" \
+  && ok "logic exports pipeStats/pipelineToCSV" || bad "logic exports pipeStats/pipelineToCSV missing"
+
+# 14: pipeStats computes per-stage counts and average score
+node -e "
+const HW=require('./js/logic.js');
+const s=HW.pipeStats([
+  {name:'A',stage:'applied',score:80},{name:'B',stage:'interview',score:60},
+  {name:'C',stage:'offer',score:null},{name:'D',stage:'applied'}
+]);
+if(s.total!==4||s.perStage.applied!==2||s.perStage.interview!==1||s.perStage.offer!==1) process.exit(1);
+if(s.avgScore!==70) {console.error(s);process.exit(1);}
+const e=HW.pipeStats([]);
+if(e.total!==0||e.avgScore!==null) process.exit(1);
+" && ok "pipeStats: per-stage counts + avg score (null when unscored)" || bad "pipeStats broken"
+
+# 15: pipelineToCSV header, row fields, and comma quoting
+node -e "
+const HW=require('./js/logic.js');
+const csv=HW.pipelineToCSV([{name:'Doe, Jane',role:'Line Cook',score:82,verdict:'strong',stage:'interview',notes:'Call Tue',ts:1728259200000}]);
+const lines=csv.split('\n');
+if(lines[0]!=='Name,Role,Score,Verdict,Stage,Notes,Added') {console.error(csv);process.exit(1);}
+if(!/\"Doe, Jane\"/.test(lines[1])||!/,82,strong,interview,Call Tue,/.test(lines[1])) process.exit(1);
+if(HW.pipelineToCSV([]).split('\n').length!==1) process.exit(1);
+" && ok "pipelineToCSV: header + quoted fields + empty case" || bad "pipelineToCSV broken"
+
+# 16: pipeline search / export / stats elements wired in index.html + app.js
+grep -q 'id="pipeSearch"' index.html && grep -q 'id="exportPipe"' index.html && grep -q 'id="pipeStats"' index.html \
+  && ok "index.html has pipeSearch/exportPipe/pipeStats" || bad "index.html missing pipeline tool elements"
+grep -q 'pipeSearch' js/app.js && grep -q 'data-note' js/app.js \
+  && ok "app.js wires pipeline search + candidate notes" || bad "app.js missing pipeline search/notes wiring"
+
+# 17: keyboard shortcut wired
+grep -q 'ctrlKey || e.metaKey' js/app.js && grep -q 'genPost' js/app.js \
+  && ok "app.js has Ctrl/Cmd+Enter shortcut" || bad "keyboard shortcut missing"
+
 echo "---- smoke: $PASS passed, $FAIL failed ----"
 [ "$FAIL" -eq 0 ]

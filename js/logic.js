@@ -253,5 +253,42 @@
     return { score, verdict, matched, partial, missing, evidence, questions: questions.slice(0, 5), years };
   }
 
-  return { generatePosts, redFlags, screenResume, mentions, norm, payLine };
+  /* ---- pipeline: stats + CSV export ---- */
+  const PIPE_STAGES = ["applied", "screening", "interview", "offer"];
+
+  // Per-stage counts + average screening score. Unknown stages pass through.
+  function pipeStats(candidates) {
+    const perStage = {};
+    for (const s of PIPE_STAGES) perStage[s] = 0;
+    let sum = 0, n = 0;
+    for (const c of candidates || []) {
+      if (perStage[c.stage] === undefined) perStage[c.stage] = 0;
+      perStage[c.stage]++;
+      if (typeof c.score === "number" && isFinite(c.score)) { sum += c.score; n++; }
+    }
+    return { perStage, total: (candidates || []).length, avgScore: n ? Math.round(sum / n) : null };
+  }
+
+  function csvCell(v) {
+    const s = String(v == null ? "" : v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  // Full pipeline export: Name,Role,Score,Verdict,Stage,Notes,Added (ISO date)
+  function pipelineToCSV(candidates) {
+    const rows = [["Name", "Role", "Score", "Verdict", "Stage", "Notes", "Added"]];
+    for (const c of candidates || []) {
+      rows.push([
+        c.name || "", c.role || "",
+        typeof c.score === "number" ? String(c.score) : "",
+        c.verdict || "", c.stage || "",
+        c.notes || "",
+        c.ts ? new Date(c.ts).toISOString().slice(0, 10) : "",
+      ]);
+    }
+    return rows.map((r) => r.map(csvCell).join(",")).join("\n");
+  }
+
+  return { generatePosts, redFlags, screenResume, mentions, norm, payLine,
+    pipeStats, pipelineToCSV };
 });

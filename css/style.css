@@ -314,3 +314,19 @@ footer {
   .row { grid-template-columns: 1fr; }
   .scorecard { gap: 14px; }
 }
+
+/* ---------- pipeline tools (search / export / stats / notes) ---------- */
+.pipe-tools { display: flex; gap: 10px; align-items: center; }
+.pipe-tools input[type="search"] { width: 220px; min-height: 40px; }
+.pipe-stats {
+  display: flex; flex-wrap: wrap; gap: 8px 22px;
+  background: var(--card); border: 1px solid var(--line);
+  padding: 12px 18px; margin-bottom: 16px; box-shadow: var(--shadow-sm);
+}
+.pstat { font-size: 13.5px; color: var(--muted); }
+.pstat strong { color: var(--ink); }
+.pnote {
+  margin-top: 8px; padding: 8px 10px; font-size: 13px;
+  background: var(--teal-soft); border-left: 3px solid var(--teal);
+  color: var(--ink-soft); white-space: pre-wrap;
+}

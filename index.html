@@ -106,8 +106,13 @@
         <h1>Every candidate, one board</h1>
         <p class="page-sub">Move candidates through stages with the arrows. Saved in this browser.</p>
       </div>
-      <button id="clearPipe" class="danger">Clear all</button>
+      <div class="pipe-tools">
+        <input id="pipeSearch" type="search" placeholder="Search name or role…" aria-label="Search pipeline">
+        <button id="exportPipe" class="secondary">Export CSV</button>
+        <button id="clearPipe" class="danger">Clear all</button>
+      </div>
     </div>
+    <div id="pipeStats" class="pipe-stats"></div>
     <div id="pipeOut" class="pipeline"></div>
   </section>
 </main>

@@ -14,6 +14,11 @@ Small businesses write vague job posts ("competitive salary! we're a family!") a
 4. **❓ Gap-Tailored Interview Questions** — 5 questions generated per candidate, probing exactly the must-haves their resume didn't show.
 5. **📋 Candidate Pipeline** — Applied → Screening → Interview → Offer board with one-click stage moves, score badges, and localStorage persistence.
 6. **👥 3 Demo Resumes** — strong match, career changer, and weak match to try the screener instantly.
+7. **📊 Pipeline Stats** — live strip with total candidates, per-stage counts, and average screening score.
+8. **🔎 Pipeline Search** — filter the board by candidate name, role, or verdict.
+9. **📝 Candidate Notes** — per-candidate notes on pipeline cards, saved locally.
+10. **⬇️ Pipeline CSV Export** — one-click download of the full pipeline (name, role, score, verdict, stage, notes, date) with safe quoting.
+11. **⌨️ Keyboard Shortcut** — Ctrl/Cmd+Enter generates the post or scores the resume from the keyboard.
 
 ## How to run
 

@@ -16,6 +16,13 @@
 
   const splitLines = (s) => (s || "").split("\n").map((x) => x.trim()).filter(Boolean);
 
+  // ---- keyboard shortcuts: Ctrl/Cmd+Enter submits the current panel ----
+  document.addEventListener("keydown", (e) => {
+    if (!((e.ctrlKey || e.metaKey) && e.key === "Enter")) return;
+    if (e.target.closest && e.target.closest("#panel-post")) { e.preventDefault(); renderPosts(); }
+    else if (e.target.closest && e.target.closest("#panel-screen")) { e.preventDefault(); runScreen(); }
+  });
+
   // ---- job post builder ----
   function readPostForm() {
     return {
@@ -97,23 +104,43 @@
   function addCandidate(c) { const p = loadPipe(); p.push(c); savePipe(p); }
   window.__hwAddCandidate = addCandidate; // for tests
 
+  let pipeQuery = "";
+  function cardMatches(c) {
+    const q = pipeQuery.trim().toLowerCase();
+    if (!q) return true;
+    return ((c.name || "") + " " + (c.role || "") + " " + (c.verdict || "")).toLowerCase().includes(q);
+  }
+
+  function renderPipeStats() {
+    const s = HW.pipeStats(loadPipe());
+    $("pipeStats").innerHTML =
+      `<span class="pstat"><strong>${s.total}</strong> candidates</span>` +
+      STAGES.map((st) => `<span class="pstat">${STAGE_LABEL[st]} <strong>${s.perStage[st]}</strong></span>`).join("") +
+      `<span class="pstat">Avg score <strong>${s.avgScore == null ? "—" : s.avgScore}</strong></span>`;
+  }
+
   function renderPipe() {
     const p = loadPipe();
+    renderPipeStats();
     $("pipeCount").textContent = p.length ? p.length : "";
+    const filtered = p.map((c, i) => ({ c, i })).filter((x) => cardMatches(x.c));
     $("pipeOut").innerHTML = STAGES.map((st) => {
-      const cards = p.map((c, i) => ({ c, i })).filter((x) => x.c.stage === st);
+      const cards = filtered.filter((x) => x.c.stage === st);
       return `<div class="column"><h3>${STAGE_LABEL[st]} <span class="count">${cards.length}</span></h3>` +
         cards.map(({ c, i }) =>
           `<div class="card verdict-${c.verdict}">
              <strong>${escapeHtml(c.name)}</strong>
              <div class="meta">${escapeHtml(c.role)}<span class="score-chip">${c.score}</span></div>
+             ${c.notes ? `<div class="pnote">${escapeHtml(c.notes)}</div>` : ""}
              <div class="cardbtns">
                ${st !== "applied" ? `<button data-mv="${i}|back" aria-label="Move back">←</button>` : ""}
                ${st !== "offer" ? `<button data-mv="${i}|fwd" aria-label="Move forward">→</button>` : `<span class="hired">★</span>`}
+               <button data-note="${i}">Notes</button>
                <button data-del="${i}" class="del">Delete</button>
              </div></div>`
         ).join("") + `</div>`;
-    }).join("");
+    }).join("") +
+      (filtered.length !== p.length ? `<p class="hint">Showing ${filtered.length} of ${p.length} candidates (search active).</p>` : "");
     document.querySelectorAll("[data-mv]").forEach((b) => b.addEventListener("click", () => {
       const [i, dir] = b.dataset.mv.split("|");
       const pl = loadPipe(); const c = pl[+i];
@@ -121,11 +148,26 @@
       c.stage = STAGES[Math.max(0, Math.min(STAGES.length - 1, idx + (dir === "fwd" ? 1 : -1)))];
       savePipe(pl);
     }));
+    document.querySelectorAll("[data-note]").forEach((b) => b.addEventListener("click", () => {
+      const pl = loadPipe(); const c = pl[+b.dataset.note];
+      const v = prompt("Notes for " + c.name + ":", c.notes || "");
+      if (v === null) return;
+      c.notes = v.trim(); savePipe(pl);
+    }));
     document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => {
       const pl = loadPipe(); pl.splice(+b.dataset.del, 1); savePipe(pl);
     }));
   }
   $("clearPipe").addEventListener("click", () => { if (confirm("Clear the whole pipeline?")) savePipe([]); });
+  $("pipeSearch").addEventListener("input", (e) => { pipeQuery = e.target.value; renderPipe(); });
+  $("exportPipe").addEventListener("click", () => {
+    const csv = HW.pipelineToCSV(loadPipe());
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "hirewise-pipeline.csv";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  });
   renderPipe();
 
   function escapeHtml(s) {

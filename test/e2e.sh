@@ -70,5 +70,30 @@ const s=fs.readFileSync('./js/samples.js','utf8');
 for(const n of ['Maria Santos','Devon Carter','Alex Morgan']) if(!s.includes(n)) process.exit(1);
 " && ok "flow7: 3 sample resumes bundled" || bad "flow7 failed"
 
+# Flow 8: pipeline lifecycle — screen, add candidate with notes, stats, CSV export
+node -e "
+const HW=require('./js/logic.js');
+// simulate: two screened candidates land in the pipeline, one gets a note
+const pipe=[
+  {name:'Maria Santos',role:'Line Cook',score:85,verdict:'strong',stage:'applied',ts:1728259200000},
+  {name:'Devon Carter',role:'Line Cook',score:55,verdict:'maybe',stage:'screening',notes:'Strong service background',ts:1728345600000}
+];
+const s=HW.pipeStats(pipe);
+if(s.total!==2||s.perStage.applied!==1||s.perStage.screening!==1||s.avgScore!==70) process.exit(1);
+const csv=HW.pipelineToCSV(pipe);
+if(!csv.includes('Maria Santos')||!csv.includes('Devon Carter')||!csv.includes('Strong service background')) process.exit(1);
+if(!csv.includes('Name,Role,Score,Verdict,Stage,Notes,Added')) process.exit(1);
+// stage moves keep stats coherent
+pipe[0].stage='interview';
+if(HW.pipeStats(pipe).perStage.interview!==1) process.exit(1);
+" && ok "flow8: pipeline stats + CSV export across screened candidates" || bad "flow8 failed"
+
+# Flow 9: notes persist on the CSV export (spreadsheet round-trip shape)
+node -e "
+const HW=require('./js/logic.js');
+const csv=HW.pipelineToCSV([{name:'X',role:'R',score:70,verdict:'maybe',stage:'offer',notes:'Multi-line\nnote',ts:0}]);
+if(!/\"Multi-line\\nnote\"/.test(csv)) {console.error(csv);process.exit(1);}
+" && ok "flow9: multi-line notes quoted safely in CSV" || bad "flow9 failed"
+
 echo "---- e2e: $PASS passed, $FAIL failed ----"
 [ "$FAIL" -eq 0 ]
