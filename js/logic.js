@@ -254,7 +254,31 @@
   }
 
   /* ---- pipeline: stats + CSV export ---- */
-  const PIPE_STAGES = ["applied", "screening", "interview", "offer"];
+  const PIPE_STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
+  const TERMINAL_STAGES = ["hired", "rejected"];
+
+  // ---- interview scorecard: 1-5 per category, weighted toward skills ----
+  const SCORE_CATS = [
+    { id: "communication", label: "Communication", weight: 1 },
+    { id: "skills", label: "Skills & experience", weight: 2 },
+    { id: "culture", label: "Culture fit", weight: 1 },
+  ];
+  // ratings: { communication: 1-5, skills: 1-5, culture: 1-5 } (any subset ok).
+  // Returns { ratings, rated, weighted, max, pct } — pct over rated cats only.
+  function scoreInterview(ratings) {
+    const out = { ratings: {}, rated: 0, weighted: 0, max: 0, pct: null };
+    for (const c of SCORE_CATS) {
+      const r = parseInt((ratings || {})[c.id], 10);
+      if (r >= 1 && r <= 5) {
+        out.ratings[c.id] = r;
+        out.rated++;
+        out.weighted += r * c.weight;
+        out.max += 5 * c.weight;
+      }
+    }
+    if (out.rated) out.pct = Math.round((out.weighted / out.max) * 100);
+    return out;
+  }
 
   // Per-stage counts + average screening score. Unknown stages pass through.
   function pipeStats(candidates) {
@@ -290,5 +314,5 @@
   }
 
   return { generatePosts, redFlags, screenResume, mentions, norm, payLine,
-    pipeStats, pipelineToCSV };
+    pipeStats, pipelineToCSV, PIPE_STAGES, TERMINAL_STAGES, SCORE_CATS, scoreInterview };
 });

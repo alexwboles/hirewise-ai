@@ -97,8 +97,11 @@
 
   // ---- pipeline ----
   const KEY = "hirewise.pipeline.v1";
-  const STAGES = ["applied", "screening", "interview", "offer"];
-  const STAGE_LABEL = { applied: "Applied", screening: "Screening", interview: "Interview", offer: "Offer" };
+  const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
+  const STAGE_LABEL = { applied: "Applied", screening: "Screening", interview: "Interview",
+    offer: "Offer", hired: "Hired", rejected: "Rejected" };
+  let scoringId = null; // candidate index with the scorecard form open
+  let cmpSel = [];      // candidate indices ticked for side-by-side compare
   function loadPipe() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } }
   function savePipe(p) { localStorage.setItem(KEY, JSON.stringify(p)); renderPipe(); }
   function addCandidate(c) { const p = loadPipe(); p.push(c); savePipe(p); }
@@ -119,6 +122,70 @@
       `<span class="pstat">Avg score <strong>${s.avgScore == null ? "—" : s.avgScore}</strong></span>`;
   }
 
+  function ivChip(c) {
+    return c.interview && c.interview.pct != null
+      ? `<span class="score-chip iv" title="Interview scorecard">IV ${c.interview.pct}%</span>` : "";
+  }
+
+  function cardHtml(c, i, st) {
+    if (scoringId === i) {
+      return `<div class="card verdict-${c.verdict}">
+        <strong>${escapeHtml(c.name)}</strong>
+        <div class="meta">Interview scorecard</div>
+        ${HW.SCORE_CATS.map((cat) =>
+          `<label class="sc-row">${cat.label} (×${cat.weight})
+            <select data-sc="${cat.id}">${[1, 2, 3, 4, 5].map((n) =>
+              `<option value="${n}"${c.interview && c.interview.ratings[cat.id] === n ? " selected" : ""}>${n}</option>`).join("")}
+            </select></label>`).join("")}
+        <div class="cardbtns">
+          <button data-scoresave="${i}" class="primary">Save score</button>
+          <button data-scorecancel>Cancel</button>
+        </div></div>`;
+    }
+    const terminal = st === "hired" || st === "rejected";
+    return `<div class="card verdict-${c.verdict}">
+       <strong>${escapeHtml(c.name)}</strong>
+       <div class="meta">${escapeHtml(c.role)}<span class="score-chip">${c.score}</span>${ivChip(c)}</div>
+       ${c.notes ? `<div class="pnote">${escapeHtml(c.notes)}</div>` : ""}
+       <div class="cardbtns">
+         ${!terminal && st !== "applied" ? `<button data-mv="${i}|back" aria-label="Move back">←</button>` : ""}
+         ${!terminal ? `<button data-mv="${i}|fwd" aria-label="Move forward">→</button>` : ""}
+         ${st === "hired" ? `<span class="hired-tag">★ hired</span>` : ""}
+         <button data-score="${i}">Score</button>
+         <button data-note="${i}">Notes</button>
+         ${!terminal ? `<button data-reject="${i}" class="del">Reject</button>` : `<button data-reopen="${i}">Reopen</button>`}
+         <button data-del="${i}" class="del">Delete</button>
+       </div>
+       <label class="cmp-check"><input type="checkbox" data-cmp="${i}"${cmpSel.includes(i) ? " checked" : ""}> compare</label>
+     </div>`;
+  }
+
+  function renderCompare() {
+    const p = loadPipe();
+    const [ia, ib] = cmpSel;
+    const a = p[ia], b = p[ib];
+    if (!a || !b) { cmpSel = []; renderPipe(); return; }
+    renderPipeStats();
+    $("pipeCount").textContent = p.length ? p.length : "";
+    const iv = (c) => (c.interview && c.interview.pct != null ? c.interview.pct + "%" : "—");
+    const rows = [
+      ["Role", a.role, b.role],
+      ["Resume score", a.score + "/100", b.score + "/100"],
+      ["Verdict", a.verdict, b.verdict],
+      ["Stage", STAGE_LABEL[a.stage] || a.stage, STAGE_LABEL[b.stage] || b.stage],
+      ["Interview", iv(a), iv(b)],
+      ["Notes", a.notes || "—", b.notes || "—"],
+    ];
+    $("pipeOut").innerHTML =
+      `<div class="compare-wrap"><div class="compare-head">
+         <h3>${escapeHtml(a.name)} <span class="vs">vs</span> ${escapeHtml(b.name)}</h3>
+         <button class="secondary" data-back-board>← Back to board</button></div>
+       <table class="data compare"><tr><th></th><th>${escapeHtml(a.name)}</th><th>${escapeHtml(b.name)}</th></tr>` +
+      rows.map((r) => `<tr><td><strong>${r[0]}</strong></td><td>${escapeHtml(String(r[1]))}</td><td>${escapeHtml(String(r[2]))}</td></tr>`).join("") +
+      `</table></div>`;
+    document.querySelector("[data-back-board]").addEventListener("click", () => { cmpSel = []; renderPipe(); });
+  }
+
   function renderPipe() {
     const p = loadPipe();
     renderPipeStats();
@@ -127,18 +194,7 @@
     $("pipeOut").innerHTML = STAGES.map((st) => {
       const cards = filtered.filter((x) => x.c.stage === st);
       return `<div class="column"><h3>${STAGE_LABEL[st]} <span class="count">${cards.length}</span></h3>` +
-        cards.map(({ c, i }) =>
-          `<div class="card verdict-${c.verdict}">
-             <strong>${escapeHtml(c.name)}</strong>
-             <div class="meta">${escapeHtml(c.role)}<span class="score-chip">${c.score}</span></div>
-             ${c.notes ? `<div class="pnote">${escapeHtml(c.notes)}</div>` : ""}
-             <div class="cardbtns">
-               ${st !== "applied" ? `<button data-mv="${i}|back" aria-label="Move back">←</button>` : ""}
-               ${st !== "offer" ? `<button data-mv="${i}|fwd" aria-label="Move forward">→</button>` : `<span class="hired">★</span>`}
-               <button data-note="${i}">Notes</button>
-               <button data-del="${i}" class="del">Delete</button>
-             </div></div>`
-        ).join("") + `</div>`;
+        cards.map(({ c, i }) => cardHtml(c, i, st)).join("") + `</div>`;
     }).join("") +
       (filtered.length !== p.length ? `<p class="hint">Showing ${filtered.length} of ${p.length} candidates (search active).</p>` : "");
     document.querySelectorAll("[data-mv]").forEach((b) => b.addEventListener("click", () => {
@@ -157,9 +213,39 @@
     document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => {
       const pl = loadPipe(); pl.splice(+b.dataset.del, 1); savePipe(pl);
     }));
+    document.querySelectorAll("[data-score]").forEach((b) => b.addEventListener("click", () => {
+      scoringId = +b.dataset.score; renderPipe();
+    }));
+    document.querySelectorAll("[data-scorecancel]").forEach((b) => b.addEventListener("click", () => {
+      scoringId = null; renderPipe();
+    }));
+    document.querySelectorAll("[data-scoresave]").forEach((b) => b.addEventListener("click", () => {
+      const i = +b.dataset.scoresave;
+      const pl = loadPipe();
+      const ratings = {};
+      b.closest(".card").querySelectorAll("[data-sc]").forEach((sel) => { ratings[sel.dataset.sc] = +sel.value; });
+      pl[i].interview = HW.scoreInterview(ratings);
+      scoringId = null;
+      savePipe(pl);
+    }));
+    document.querySelectorAll("[data-reject]").forEach((b) => b.addEventListener("click", () => {
+      const pl = loadPipe(); pl[+b.dataset.reject].stage = "rejected"; savePipe(pl);
+    }));
+    document.querySelectorAll("[data-reopen]").forEach((b) => b.addEventListener("click", () => {
+      const pl = loadPipe(); pl[+b.dataset.reopen].stage = "screening"; savePipe(pl);
+    }));
+    document.querySelectorAll("[data-cmp]").forEach((box) => box.addEventListener("change", () => {
+      const i = +box.dataset.cmp;
+      cmpSel = box.checked ? [...new Set([...cmpSel, i])].slice(-2) : cmpSel.filter((x) => x !== i);
+      renderPipe();
+    }));
   }
   $("clearPipe").addEventListener("click", () => { if (confirm("Clear the whole pipeline?")) savePipe([]); });
   $("pipeSearch").addEventListener("input", (e) => { pipeQuery = e.target.value; renderPipe(); });
+  $("compareBtn").addEventListener("click", () => {
+    if (cmpSel.length === 2) renderCompare();
+    else alert("Tick “compare” on exactly two candidates first.");
+  });
   $("exportPipe").addEventListener("click", () => {
     const csv = HW.pipelineToCSV(loadPipe());
     const a = document.createElement("a");
