@@ -76,9 +76,17 @@
     };
     const r = HW.screenResume(input);
     const badge = r.verdict === "strong" ? "Strong fit" : r.verdict === "maybe" ? "Maybe" : "Not a fit";
+    const circ = (2 * Math.PI * 34).toFixed(1);
+    const arc = ((r.score / 100) * 2 * Math.PI * 34).toFixed(1);
     $("screenOut").innerHTML = `
       <div class="scorecard verdict-${r.verdict}">
-        <div class="scorenum">${r.score}<span>/100</span></div>
+        <div class="dial" role="img" aria-label="Fit score ${r.score} of 100">
+          <svg viewBox="0 0 84 84" width="104" height="104" aria-hidden="true">
+            <circle cx="42" cy="42" r="34" class="dial-track"/>
+            <circle cx="42" cy="42" r="34" class="dial-fill" stroke-dasharray="${arc} ${circ}" transform="rotate(-90 42 42)"/>
+            <text x="42" y="50" text-anchor="middle" class="dial-num">${r.score}</text>
+          </svg>
+        </div>
         <div class="verdict">${badge}</div>
       </div>
       <h3>Evidence</h3>
@@ -149,9 +157,11 @@
         </div></div>`;
     }
     const terminal = st === "hired" || st === "rejected";
+    const scoreChip = (typeof c.score === "number" && isFinite(c.score))
+      ? `<span class="score-chip">${c.score}</span>` : `<span class="score-chip unscored">new</span>`;
     return `<div class="card verdict-${c.verdict}">
        <strong>${escapeHtml(c.name)}</strong>
-       <div class="meta">${escapeHtml(c.role)}<span class="score-chip">${c.score}</span>${ivChip(c)}${stageChip(c, st)}</div>
+       <div class="meta">${escapeHtml(c.role)}${scoreChip}${ivChip(c)}${stageChip(c, st)}</div>
        ${c.notes ? `<div class="pnote">${escapeHtml(c.notes)}</div>` : ""}
        <div class="cardbtns">
          ${!terminal && st !== "applied" ? `<button data-mv="${i}|back" aria-label="Move back">←</button>` : ""}
@@ -279,6 +289,13 @@
     }));
   }
   $("clearPipe").addEventListener("click", () => { if (confirm("Clear the whole pipeline?")) savePipe([]); });
+  $("quickAdd").addEventListener("click", () => {
+    const name = $("qaName").value.trim();
+    const role = $("qaRole").value.trim() || "—";
+    if (!name) { alert("Enter a candidate name first."); return; }
+    addCandidate({ name, role, score: null, verdict: "new", stage: "applied", ts: Date.now() });
+    $("qaName").value = ""; $("qaRole").value = "";
+  });
   $("pipeSearch").addEventListener("input", (e) => { pipeQuery = e.target.value; renderPipe(); });
   $("compareBtn").addEventListener("click", () => {
     if (cmpSel.length === 2) renderCompare();

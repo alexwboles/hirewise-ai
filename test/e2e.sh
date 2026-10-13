@@ -126,5 +126,17 @@ const old={name:'Old',stage:'screening',ts:later-30*864e5};
 if(HW.daysInStage(old,later)!==30) process.exit(1);
 " && ok "flow10: stage history, stall detection, offer letter, rejection email" || bad "flow10 failed"
 
+node -e "
+const HW=require('/home/hatch/workspace/hirewise-ai/js/logic.js');
+// quick-add candidate shape: null score must not break stats/CSV
+const cands=[{name:'New Person',role:'Cook',score:null,verdict:'new',stage:'applied',ts:Date.now(),notes:''},
+             {name:'Scored',role:'Cook',score:80,verdict:'strong',stage:'applied',ts:Date.now(),notes:''}];
+const s=HW.pipeStats(cands);
+if(s.total!==2) process.exit(1);
+if(s.avgScore!==80) { console.log('avg='+s.avgScore); process.exit(1); }
+const csv=HW.pipelineToCSV(cands);
+if(!csv.includes('New Person')) process.exit(1);
+" && ok "flow11: quick-add null-score candidate keeps stats + CSV working" || bad "flow11 failed"
+
 echo "---- e2e: $PASS passed, $FAIL failed ----"
 [ "$FAIL" -eq 0 ]

@@ -131,6 +131,15 @@ grep -q 'id="stallOut"' index.html && grep -q 'id="docModal"' index.html \
   && ok "index.html has stallOut + docModal" || bad "index.html missing stall/doc elements"
 grep -q 'data-offer' js/app.js && grep -q 'data-rejmail' js/app.js && grep -q 'stalledCandidates' js/app.js \
   && ok "app.js wires offer letters + rejection emails + stall banner" || bad "app.js missing doc/stall wiring"
+grep -q 'id="qaName"' index.html && grep -q 'id="qaRole"' index.html && grep -q 'id="quickAdd"' index.html \
+  && ok "index.html has quick-add candidate controls" || bad "index.html missing quick-add"
+grep -q 'dial-fill' js/app.js && grep -q 'stroke-dasharray' js/app.js && grep -q 'quickAdd' js/app.js \
+  && grep -q 'verdict: "new"' js/app.js && grep -q 'unscored' js/app.js \
+  && ok "app.js wires score dial + quick-add + unscored chip" || bad "app.js missing redesign wiring"
+grep -q 'class="shell"' index.html && grep -q 'local-pill' index.html \
+  && ok "index.html uses sidebar shell" || bad "index.html missing shell"
+! grep -E 'border-radius:[[:space:]]*[1-9]' css/style.css | grep -qv '50%' \
+  && ok "no rounded edges in CSS" || bad "rounded edges found in CSS"
 
 echo "---- smoke: $PASS passed, $FAIL failed ----"
 [ "$FAIL" -eq 0 ]
