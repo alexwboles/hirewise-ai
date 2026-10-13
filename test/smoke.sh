@@ -96,5 +96,41 @@ grep -q 'pipeSearch' js/app.js && grep -q 'data-note' js/app.js \
 grep -q 'ctrlKey || e.metaKey' js/app.js && grep -q 'genPost' js/app.js \
   && ok "app.js has Ctrl/Cmd+Enter shortcut" || bad "keyboard shortcut missing"
 
+# 18: logic exports stage tracking + document generators
+node -e "const HW=require('./js/logic.js'); if(!HW.stampStage||!HW.daysInStage||!HW.stalledCandidates||!HW.offerLetter||!HW.rejectionEmail) process.exit(1);" \
+  && ok "logic exports stampStage/daysInStage/stalledCandidates/offerLetter/rejectionEmail" || bad "new logic exports missing"
+
+# 19: stage log dedupes, daysInStage math, stall filter, offer + rejection docs
+node -e "
+const HW=require('./js/logic.js');
+const c={};
+HW.stampStage(c,'applied',1000);
+HW.stampStage(c,'applied',2000);
+if(c.stageLog.length!==1) process.exit(1);
+HW.stampStage(c,'interview',1000+2*864e5);
+if(c.stageLog.length!==2||c.stage!=='interview') process.exit(1);
+if(HW.daysInStage(c,1000+5*864e5)!==3) process.exit(1);
+const now=1000+20*864e5;
+const stalled=HW.stalledCandidates([c,{name:'H',stage:'hired',ts:0}],7,now);
+if(stalled.length!==1||stalled[0].days!==18) {console.error(stalled);process.exit(1);}
+const L=HW.offerLetter({name:'Maria',role:'Line Cook',company:'Sunny Side',pay:'22',payType:'hourly',startDate:'2026-11-01',manager:'Pat',tone:'warm'});
+if(!/Maria/.test(L)||!/Line Cook/.test(L)||!/22 per hour/.test(L)||!/2026-11-01/.test(L)||!/Pat/.test(L)) {console.error(L);process.exit(1);}
+const L2=HW.offerLetter({});
+if(!/\[Candidate name\]/.test(L2)) process.exit(1);
+const r=HW.rejectionEmail({name:'Devon',role:'Line Cook',company:'Sunny Side',tone:'encouraging'});
+if(!/Devon/.test(r.body)||!/keep your resume on file/.test(r.body)) {console.error(r);process.exit(1);}
+if(!/Thank you for applying/.test(r.subject)) process.exit(1);
+const rb=HW.rejectionEmail({tone:'brief'});
+if(rb.body.length>=r.body.length) process.exit(1);
+const rw=HW.rejectionEmail({tone:'bogus'});
+if(rw.tone!=='warm') process.exit(1);
+" && ok "stampStage/daysInStage/stalledCandidates/offerLetter/rejectionEmail" || bad "stage tracking / doc generation broken"
+
+# 20: stall banner + document modal + offer/rejection wiring
+grep -q 'id="stallOut"' index.html && grep -q 'id="docModal"' index.html \
+  && ok "index.html has stallOut + docModal" || bad "index.html missing stall/doc elements"
+grep -q 'data-offer' js/app.js && grep -q 'data-rejmail' js/app.js && grep -q 'stalledCandidates' js/app.js \
+  && ok "app.js wires offer letters + rejection emails + stall banner" || bad "app.js missing doc/stall wiring"
+
 echo "---- smoke: $PASS passed, $FAIL failed ----"
 [ "$FAIL" -eq 0 ]

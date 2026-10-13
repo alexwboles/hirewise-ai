@@ -95,5 +95,36 @@ const csv=HW.pipelineToCSV([{name:'X',role:'R',score:70,verdict:'maybe',stage:'o
 if(!/\"Multi-line\\nnote\"/.test(csv)) {console.error(csv);process.exit(1);}
 " && ok "flow9: multi-line notes quoted safely in CSV" || bad "flow9 failed"
 
+# Flow 10: stage lifecycle — moves stamp history, stalls surface, docs generate
+node -e "
+const HW=require('./js/logic.js');
+// simulate a candidate journey with controlled timestamps
+let now=1728259200000;
+const c={name:'Maria Santos',role:'Line Cook',score:85,verdict:'strong'};
+HW.stampStage(c,'applied',now);
+now+=2*864e5; HW.stampStage(c,'screening',now);
+now+=10*864e5; HW.stampStage(c,'interview',now);
+if(c.stageLog.length!==3) process.exit(1);
+// 9 days later, still in interview -> stalled (>7)
+const later=now+9*864e5;
+const stalled=HW.stalledCandidates([c],7,later);
+if(stalled.length!==1||stalled[0].days!==9) {console.error(stalled);process.exit(1);}
+// move to offer resets the clock
+HW.stampStage(c,'offer',later);
+if(HW.stalledCandidates([c],7,later).length!==0) process.exit(1);
+// hired: offer letter reads right
+HW.stampStage(c,'hired',later+864e5);
+const L=HW.offerLetter({name:c.name,role:c.role,company:'Sunny Side',pay:'24',payType:'hourly',startDate:'2026-12-01',manager:'Pat'});
+if(!/offer you the position of Line Cook/.test(L)) process.exit(1);
+// rejected path: encouraging rejection keeps the door open
+const r2={name:'Devon Carter',role:'Line Cook'};
+HW.stampStage(r2,'rejected',later);
+const rej=HW.rejectionEmail({name:r2.name,role:r2.role,company:'Sunny Side',tone:'encouraging'});
+if(!/reach out when something fits/.test(rej.body)) process.exit(1);
+// daysInStage falls back to ts for pre-log candidates
+const old={name:'Old',stage:'screening',ts:later-30*864e5};
+if(HW.daysInStage(old,later)!==30) process.exit(1);
+" && ok "flow10: stage history, stall detection, offer letter, rejection email" || bad "flow10 failed"
+
 echo "---- e2e: $PASS passed, $FAIL failed ----"
 [ "$FAIL" -eq 0 ]

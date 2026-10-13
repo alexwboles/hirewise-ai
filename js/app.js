@@ -104,7 +104,7 @@
   let cmpSel = [];      // candidate indices ticked for side-by-side compare
   function loadPipe() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } }
   function savePipe(p) { localStorage.setItem(KEY, JSON.stringify(p)); renderPipe(); }
-  function addCandidate(c) { const p = loadPipe(); p.push(c); savePipe(p); }
+  function addCandidate(c) { const p = loadPipe(); HW.stampStage(c, c.stage || "applied", c.ts || Date.now()); p.push(c); savePipe(p); }
   window.__hwAddCandidate = addCandidate; // for tests
 
   let pipeQuery = "";
@@ -127,6 +127,12 @@
       ? `<span class="score-chip iv" title="Interview scorecard">IV ${c.interview.pct}%</span>` : "";
   }
 
+  function stageChip(c, st) {
+    if (HW.TERMINAL_STAGES.indexOf(st) !== -1) return "";
+    const d = HW.daysInStage(c);
+    return `<span class="stage-chip${d > 7 ? " stalled" : ""}" title="Time in this stage">${d}d</span>`;
+  }
+
   function cardHtml(c, i, st) {
     if (scoringId === i) {
       return `<div class="card verdict-${c.verdict}">
@@ -145,12 +151,13 @@
     const terminal = st === "hired" || st === "rejected";
     return `<div class="card verdict-${c.verdict}">
        <strong>${escapeHtml(c.name)}</strong>
-       <div class="meta">${escapeHtml(c.role)}<span class="score-chip">${c.score}</span>${ivChip(c)}</div>
+       <div class="meta">${escapeHtml(c.role)}<span class="score-chip">${c.score}</span>${ivChip(c)}${stageChip(c, st)}</div>
        ${c.notes ? `<div class="pnote">${escapeHtml(c.notes)}</div>` : ""}
        <div class="cardbtns">
          ${!terminal && st !== "applied" ? `<button data-mv="${i}|back" aria-label="Move back">←</button>` : ""}
          ${!terminal ? `<button data-mv="${i}|fwd" aria-label="Move forward">→</button>` : ""}
-         ${st === "hired" ? `<span class="hired-tag">★ hired</span>` : ""}
+         ${st === "hired" ? `<span class="hired-tag">★ hired</span> <button data-offer="${i}">Offer letter</button>` : ""}
+         ${st === "rejected" ? `<button data-rejmail="${i}">Rejection email</button>` : ""}
          <button data-score="${i}">Score</button>
          <button data-note="${i}">Notes</button>
          ${!terminal ? `<button data-reject="${i}" class="del">Reject</button>` : `<button data-reopen="${i}">Reopen</button>`}
@@ -190,6 +197,11 @@
     const p = loadPipe();
     renderPipeStats();
     $("pipeCount").textContent = p.length ? p.length : "";
+    const stalled = HW.stalledCandidates(p, 7);
+    $("stallOut").innerHTML = stalled.length
+      ? `<div class="notice"><strong>Stalled.</strong> ` + stalled.map((s) =>
+        `${escapeHtml(s.candidate.name)} — ${s.days} days in ${STAGE_LABEL[s.candidate.stage] || escapeHtml(s.candidate.stage)}`).join("; ") + "</div>"
+      : "";
     const filtered = p.map((c, i) => ({ c, i })).filter((x) => cardMatches(x.c));
     $("pipeOut").innerHTML = STAGES.map((st) => {
       const cards = filtered.filter((x) => x.c.stage === st);
@@ -201,7 +213,7 @@
       const [i, dir] = b.dataset.mv.split("|");
       const pl = loadPipe(); const c = pl[+i];
       const idx = STAGES.indexOf(c.stage);
-      c.stage = STAGES[Math.max(0, Math.min(STAGES.length - 1, idx + (dir === "fwd" ? 1 : -1)))];
+      HW.stampStage(c, STAGES[Math.max(0, Math.min(STAGES.length - 1, idx + (dir === "fwd" ? 1 : -1)))]);
       savePipe(pl);
     }));
     document.querySelectorAll("[data-note]").forEach((b) => b.addEventListener("click", () => {
@@ -229,15 +241,41 @@
       savePipe(pl);
     }));
     document.querySelectorAll("[data-reject]").forEach((b) => b.addEventListener("click", () => {
-      const pl = loadPipe(); pl[+b.dataset.reject].stage = "rejected"; savePipe(pl);
+      const pl = loadPipe(); HW.stampStage(pl[+b.dataset.reject], "rejected"); savePipe(pl);
     }));
     document.querySelectorAll("[data-reopen]").forEach((b) => b.addEventListener("click", () => {
-      const pl = loadPipe(); pl[+b.dataset.reopen].stage = "screening"; savePipe(pl);
+      const pl = loadPipe(); HW.stampStage(pl[+b.dataset.reopen], "screening"); savePipe(pl);
     }));
     document.querySelectorAll("[data-cmp]").forEach((box) => box.addEventListener("change", () => {
       const i = +box.dataset.cmp;
       cmpSel = box.checked ? [...new Set([...cmpSel, i])].slice(-2) : cmpSel.filter((x) => x !== i);
       renderPipe();
+    }));
+    document.querySelectorAll("[data-offer]").forEach((b) => b.addEventListener("click", () => {
+      const c = loadPipe()[+b.dataset.offer];
+      openDoc("Offer letter — " + c.name,
+        `<div class="doc-form">
+           <label>Company <input data-f="company" placeholder="e.g. Sunny Side Diner"></label>
+           <div class="row"><label>Pay <input data-f="pay" inputmode="decimal" placeholder="22"></label>
+           <label>Type <select data-f="payType"><option value="hourly">per hour</option><option value="salary">per year</option></select></label></div>
+           <div class="row"><label>Start date <input data-f="startDate" type="date"></label>
+           <label>Hiring manager <input data-f="manager" placeholder="Your name"></label></div>
+           <label>Tone <select data-f="tone"><option value="professional">Professional</option><option value="warm">Warm</option></select></label>
+         </div>`,
+        (v) => HW.offerLetter({ name: c.name, role: c.role, company: v.company, pay: v.pay,
+          payType: v.payType, startDate: v.startDate, manager: v.manager, tone: v.tone }));
+    }));
+    document.querySelectorAll("[data-rejmail]").forEach((b) => b.addEventListener("click", () => {
+      const c = loadPipe()[+b.dataset.rejmail];
+      openDoc("Rejection email — " + c.name,
+        `<div class="doc-form">
+           <label>Company <input data-f="company" placeholder="e.g. Sunny Side Diner"></label>
+           <label>Tone <select data-f="tone"><option value="warm">Warm</option><option value="encouraging">Encouraging (keep the door open)</option><option value="brief">Brief</option></select></label>
+         </div>`,
+        (v) => {
+          const e = HW.rejectionEmail({ name: c.name, role: c.role, company: v.company, tone: v.tone });
+          return "Subject: " + e.subject + "\n\n" + e.body;
+        });
     }));
   }
   $("clearPipe").addEventListener("click", () => { if (confirm("Clear the whole pipeline?")) savePipe([]); });
@@ -254,6 +292,32 @@
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   });
+  // ---- document modal: offer letters + rejection emails ----
+  function openDoc(title, formHtml, render) {
+    $("docTitle").textContent = title;
+    $("docForm").innerHTML = formHtml;
+    $("docModal").classList.remove("hidden");
+    const update = () => {
+      const vals = {};
+      $("docForm").querySelectorAll("[data-f]").forEach((inp) => { vals[inp.dataset.f] = inp.value; });
+      $("docOut").textContent = render(vals);
+    };
+    $("docForm").querySelectorAll("[data-f]").forEach((inp) => inp.addEventListener("input", update));
+    update();
+    $("docCopy").onclick = () => {
+      navigator.clipboard.writeText($("docOut").textContent).catch(() => {});
+      $("docCopy").textContent = "Copied!";
+      setTimeout(() => ($("docCopy").textContent = "Copy"), 1500);
+    };
+  }
+  $("docClose").addEventListener("click", () => $("docModal").classList.add("hidden"));
+  $("docModal").addEventListener("click", (e) => {
+    if (e.target === $("docModal")) $("docModal").classList.add("hidden");
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") $("docModal").classList.add("hidden");
+  });
+
   renderPipe();
 
   function escapeHtml(s) {

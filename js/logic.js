@@ -313,6 +313,119 @@
     return rows.map((r) => r.map(csvCell).join(",")).join("\n");
   }
 
+  // ---- stage history: how long has this candidate sat in each stage? ----
+  // stampStage appends {stage, at} when the stage actually changes.
+  function stampStage(c, stage, atMs) {
+    if (!c) return c;
+    const at = atMs == null ? Date.now() : atMs;
+    c.stageLog = c.stageLog || [];
+    const last = c.stageLog[c.stageLog.length - 1];
+    if (!last || last.stage !== stage) c.stageLog.push({ stage, at });
+    c.stage = stage;
+    return c;
+  }
+
+  // Whole days in the current stage (falls back to `ts` for pre-log candidates).
+  function daysInStage(c, nowMs) {
+    const now = nowMs == null ? Date.now() : nowMs;
+    const log = (c && c.stageLog) || [];
+    const since = log.length ? log[log.length - 1].at : (c && c.ts) || now;
+    return Math.max(0, Math.floor((now - since) / 864e5));
+  }
+
+  // Non-terminal candidates sitting longer than maxDays (default 7).
+  function stalledCandidates(candidates, maxDays, nowMs) {
+    const max = maxDays == null ? 7 : maxDays;
+    return (candidates || [])
+      .filter((c) => TERMINAL_STAGES.indexOf(c.stage) === -1 && daysInStage(c, nowMs) > max)
+      .map((c) => ({ candidate: c, days: daysInStage(c, nowMs) }))
+      .sort((a, b) => b.days - a.days);
+  }
+
+  // ---- offer letter draft (hired candidates) ----
+  function offerLetter(d) {
+    d = d || {};
+    const name = (d.name || "[Candidate name]").trim() || "[Candidate name]";
+    const role = (d.role || "[Role]").trim() || "[Role]";
+    const company = (d.company || "[Company]").trim() || "[Company]";
+    const pay = (d.pay || "").trim();
+    const payType = d.payType === "salary" ? "per year" : "per hour";
+    const start = (d.startDate || "[start date]").trim() || "[start date]";
+    const manager = (d.manager || "[Hiring manager]").trim() || "[Hiring manager]";
+    const warm = d.tone === "warm";
+    const lines = [
+      warm ? `Dear ${name} — great news.` : `Dear ${name},`,
+      "",
+      warm
+        ? `We're thrilled to offer you the ${role} position at ${company}. You stood out through the whole process, and we'd love to have you on the team.`
+        : `We are pleased to offer you the position of ${role} at ${company}.`,
+      "",
+      "The details:",
+      `• Start date: ${start}`,
+      pay ? `• Pay: $${pay} ${payType}` : "• Pay: [pay rate]",
+      `• Reporting to: ${manager}`,
+      "",
+      "This offer is contingent on any background checks or references we discussed. " +
+        "To accept, just reply to this email — we'll send the paperwork right over.",
+      "",
+      warm ? "Welcome aboard — we can't wait to work with you." : "We look forward to working with you.",
+      "",
+      `Best regards,`,
+      manager,
+      company,
+    ];
+    return lines.join("\n");
+  }
+
+  // ---- rejection email (rejected candidates) ----
+  // tones: "warm" (default), "brief", "encouraging" (keeps the door open).
+  function rejectionEmail(d) {
+    d = d || {};
+    const name = (d.name || "[Candidate name]").trim() || "[Candidate name]";
+    const role = (d.role || "[Role]").trim() || "[Role]";
+    const company = (d.company || "[Company]").trim() || "[Company]";
+    const tone = ["warm", "brief", "encouraging"].indexOf(d.tone) === -1 ? "warm" : d.tone;
+    const subject = `Thank you for applying — ${role} at ${company}`;
+    let body;
+    if (tone === "brief") {
+      body = [
+        `Hi ${name},`,
+        "",
+        `Thank you for applying for the ${role} role. We've decided to move forward with another candidate this time.`,
+        "",
+        `We appreciate your interest in ${company} and wish you the best.`,
+        "",
+        company,
+      ].join("\n");
+    } else if (tone === "encouraging") {
+      body = [
+        `Hi ${name},`,
+        "",
+        `Thank you for taking the time to apply for the ${role} role at ${company} — we genuinely enjoyed meeting you.`,
+        "",
+        `We've decided to go with another candidate for this opening, but you made a strong impression. We'd love to keep your resume on file and reach out when something fits.`,
+        "",
+        `Wishing you the best in your search,`,
+        company,
+      ].join("\n");
+    } else {
+      body = [
+        `Hi ${name},`,
+        "",
+        `Thank you so much for your interest in the ${role} position at ${company}, and for the time you put into the process.`,
+        "",
+        `After careful consideration, we've decided to move forward with another candidate. This wasn't an easy call — please don't read it as a verdict on your abilities.`,
+        "",
+        `We're grateful you considered us, and we wish you every success.`,
+        "",
+        `Warmly,`,
+        company,
+      ].join("\n");
+    }
+    return { subject, body, tone };
+  }
+
   return { generatePosts, redFlags, screenResume, mentions, norm, payLine,
-    pipeStats, pipelineToCSV, PIPE_STAGES, TERMINAL_STAGES, SCORE_CATS, scoreInterview };
+    pipeStats, pipelineToCSV, PIPE_STAGES, TERMINAL_STAGES, SCORE_CATS, scoreInterview,
+    stampStage, daysInStage, stalledCandidates, offerLetter, rejectionEmail };
 });

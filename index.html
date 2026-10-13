@@ -114,9 +114,22 @@
       </div>
     </div>
     <div id="pipeStats" class="pipe-stats"></div>
+    <div id="stallOut"></div>
     <div id="pipeOut" class="pipeline"></div>
   </section>
 </main>
+
+<div id="docModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="docTitle">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="docTitle"></h3>
+      <button id="docClose" class="secondary">Close</button>
+    </div>
+    <div id="docForm"></div>
+    <pre id="docOut" class="doc-out"></pre>
+    <div class="modal-actions"><button id="docCopy" class="primary">Copy</button></div>
+  </div>
+</div>
 
 <footer>
   <p>HireWise AI · free to run · your data never leaves this browser · <a href="README.md">README</a></p>
