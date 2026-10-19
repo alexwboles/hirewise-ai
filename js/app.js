@@ -166,7 +166,7 @@
        <div class="cardbtns">
          ${!terminal && st !== "applied" ? `<button data-mv="${i}|back" aria-label="Move back">←</button>` : ""}
          ${!terminal ? `<button data-mv="${i}|fwd" aria-label="Move forward">→</button>` : ""}
-         ${st === "hired" ? `<span class="hired-tag">★ hired</span> <button data-offer="${i}">Offer letter</button>` : ""}
+         ${st === "hired" ? `<span class="hired-tag">★ hired</span> <button data-offer="${i}">Offer letter</button> ${c.onboardId ? `<button data-viewon="${i}">View onboarding</button>` : `<button data-onboard="${i}" class="primary">Start onboarding</button>`}` : ""}
          ${st === "rejected" ? `<button data-rejmail="${i}">Rejection email</button>` : ""}
          <button data-score="${i}">Score</button>
          <button data-note="${i}">Notes</button>
@@ -184,6 +184,9 @@
     if (!a || !b) { cmpSel = []; renderPipe(); return; }
     renderPipeStats();
     $("pipeCount").textContent = p.length ? p.length : "";
+    const obCount = (window.__hwOnboard && typeof window.__hwOnboard.count === "function") ? window.__hwOnboard.count() : 0;
+    const obEl = $("onboardCount");
+    if (obEl) obEl.textContent = obCount ? obCount : "";
     const iv = (c) => (c.interview && c.interview.pct != null ? c.interview.pct + "%" : "—");
     const rScore = (c) => (typeof c.score === "number" && isFinite(c.score) ? c.score + "/100" : "—");
     const rows = [
@@ -208,6 +211,9 @@
     const p = loadPipe();
     renderPipeStats();
     $("pipeCount").textContent = p.length ? p.length : "";
+    const obN = (window.__hwOnboard && typeof window.__hwOnboard.count === "function") ? window.__hwOnboard.count() : 0;
+    const obT = $("onboardCount");
+    if (obT) obT.textContent = obN ? obN : "";
     const stalled = HW.stalledCandidates(p, 7);
     $("stallOut").innerHTML = stalled.length
       ? `<div class="notice"><strong>Stalled.</strong> ` + stalled.map((s) =>
@@ -288,6 +294,51 @@
           return "Subject: " + e.subject + "\n\n" + e.body;
         });
     }));
+    // ---- pipeline → onboarding bridge (merged from OnboardPilot AI) ----
+    document.querySelectorAll("[data-onboard]").forEach((b) => b.addEventListener("click", () => {
+      const pl = loadPipe();
+      openOnboardModal(pl, +b.dataset.onboard, pl[+b.dataset.onboard]);
+    }));
+    document.querySelectorAll("[data-viewon]").forEach((b) => b.addEventListener("click", () => {
+      const c = loadPipe()[+b.dataset.viewon];
+      if (window.__hwOnboard && c.onboardId) window.__hwOnboard.open(c.onboardId);
+    }));
+  }
+  // Start onboarding for a hired candidate: pick a role template, start date, buddy.
+  // Creates the Day 1 / Week 1 / Day 30 checklist on the same hire record journey.
+  function openOnboardModal(pl, idx, c) {
+    const bridge = window.__hwOnboard;
+    if (!bridge) { alert("The onboarding module is still loading — try again in a moment."); return; }
+    const roles = bridge.roles();
+    const buddies = bridge.buddies();
+    if (!roles.length) { alert("No role templates available yet — add one under Onboard → Roles first."); return; }
+    const roleGuess = roles.find((r) => r.toLowerCase() === String(c.role || "").toLowerCase()) || roles[0];
+    openDoc("Start onboarding — " + c.name,
+      `<div class="doc-form">
+         <label>Role template <select data-f="role">${roles.map((r) =>
+           `<option${r === roleGuess ? " selected" : ""}>${escapeHtml(r)}</option>`).join("")}</select></label>
+         <div class="row"><label>Start date <input data-f="startDate" type="date"></label>
+         <label>Buddy <select data-f="buddy"><option value="">— none —</option>${buddies.map((x) =>
+           `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join("")}</select></label></div>
+       </div>`,
+      (v) => {
+        const bName = v.buddy ? (buddies.find((x) => x.id === v.buddy) || {}).name : null;
+        return `Creates a Day 1 / Week 1 / Day 30 onboarding checklist for ${c.name} ` +
+          `(${v.role || "—"})${v.startDate ? ", starting " + v.startDate : " (no start date yet)"}.\n` +
+          `Buddy: ${bName || "none"}.\n\nHit "Create checklist" to add them to the Onboard tab.`;
+      });
+    $("docCopy").textContent = "Create checklist";
+    $("docCopy").onclick = () => {
+      const vals = {};
+      $("docForm").querySelectorAll("[data-f]").forEach((inp) => { vals[inp.dataset.f] = inp.value; });
+      const h = bridge.add(c.name, vals.role, vals.startDate || null, vals.buddy || null, "pipeline");
+      if (!h) { alert("Couldn't create the checklist for that role — pick a different template."); return; }
+      pl[idx].onboardId = h.id;
+      savePipe(pl);
+      $("docModal").classList.add("hidden");
+      $("docCopy").textContent = "Copy";
+      bridge.open(h.id);
+    };
   }
   $("clearPipe").addEventListener("click", () => { if (confirm("Clear the whole pipeline?")) savePipe([]); });
   $("quickAdd").addEventListener("click", () => {
@@ -315,6 +366,7 @@
     $("docTitle").textContent = title;
     $("docForm").innerHTML = formHtml;
     $("docModal").classList.remove("hidden");
+    $("docCopy").textContent = "Copy";
     const update = () => {
       const vals = {};
       $("docForm").querySelectorAll("[data-f]").forEach((inp) => { vals[inp.dataset.f] = inp.value; });

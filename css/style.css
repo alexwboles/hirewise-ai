@@ -356,3 +356,211 @@ footer a { color: var(--terra-deep); }
 @media (max-width: 560px) {
   .pipeline { grid-template-columns: minmax(240px, 1fr); }
 }
+
+/* ================================================================
+   ONBOARDING — ported from OnboardPilot AI (merge workstream E).
+   Every selector is scoped under #panel-onboard so the hire-side
+   (.card, .badge, .btn, .view …) never collides with pipeline styles.
+   Palette remapped: forest → terracotta, gold secondary kept.
+   ================================================================ */
+
+#panel-onboard .opnav { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
+#panel-onboard .opnav button {
+  border: 1.5px solid var(--line); background: #fff; cursor: pointer;
+  font-size: 13px; font-weight: 700; padding: 8px 16px; color: var(--ink-soft);
+}
+#panel-onboard .opnav button:hover { border-color: var(--terra); color: var(--terra-deep); }
+#panel-onboard .opnav button.active { background: var(--terra); border-color: var(--terra); color: #fff; }
+/* ============ OnboardPilot AI — "The Welcome Desk" ============
+   Warm HR software: deep forest-green sidebar, cream paper workspace,
+   gold secondary accent. Grounded in BambooHR (phase-grouped checklists,
+   per-task due dates, warm people-first design) and Rippling (30-60-90
+   milestone thinking). Zero rounded edges. */
+
+
+
+/* ============ workspace ============ */
+#panel-onboard .view { display: none; }
+#panel-onboard .view.active { display: block; }
+#panel-onboard .card {
+  background: var(--card); border: 1px solid var(--line);
+  border-top: 4px solid var(--terra); box-shadow: var(--shadow);
+  padding: 22px 24px; margin-bottom: 18px;
+}
+#panel-onboard .card h2 { margin: 0 0 14px; font-size: 19px; letter-spacing: -.3px; }
+#panel-onboard .card h3 { margin: 18px 0 10px; font-size: 16px; }
+#panel-onboard .small { font-size: 13px; }
+#panel-onboard .muted { color: var(--muted); }
+
+/* ============ forms & buttons ============ */
+#panel-onboard .form-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+#panel-onboard label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+#panel-onboard input, #panel-onboard select, #panel-onboard textarea {
+  font: inherit; font-size: 14px; color: var(--ink);
+  border: 1.5px solid var(--line); padding: 10px 13px; background: #fff;
+}
+#panel-onboard input:focus, #panel-onboard select:focus, #panel-onboard textarea:focus {
+  outline: none; border-color: var(--terra);
+  box-shadow: 0 0 0 3px rgba(30, 70, 51, .13);
+}
+#panel-onboard .btn {
+  background: var(--terra); border: 1.5px solid var(--terra); color: #fff;
+  padding: 10px 18px; font-weight: 700; font-size: 14px; cursor: pointer;
+  box-shadow: 0 4px 14px -4px rgba(30, 70, 51, .5);
+  transition: transform .15s, background .15s;
+}
+#panel-onboard .btn:hover { background: var(--terra-deep); transform: translateY(-1px); }
+#panel-onboard .btn.ghost { background: #fff; border-color: var(--line); color: var(--ink); box-shadow: none; }
+#panel-onboard .btn.ghost:hover { border-color: var(--terra); }
+#panel-onboard .btn.danger { background: transparent; border-color: #eec5c1; color: var(--red); box-shadow: none; }
+#panel-onboard .btn.danger:hover { background: var(--red-soft); }
+#panel-onboard .btn.small { padding: 6px 12px; font-size: 12.5px; }
+
+/* ============ badges & chips ============ */
+#panel-onboard .badge {
+  display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .8px;
+  text-transform: uppercase; padding: 3px 10px; background: var(--paper-2); color: var(--ink-soft);
+}
+#panel-onboard .badge.overdue { background: var(--red-soft); color: var(--red); border: 1px solid #eec5c1; }
+#panel-onboard .badge.done { background: var(--green-soft); color: var(--green); border: 1px solid #bfe3cb; }
+#panel-onboard .due-chip {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  background: var(--paper-2); color: var(--ink-soft); padding: 3px 10px;
+  border: 1px solid var(--line); white-space: nowrap;
+}
+#panel-onboard .due-chip.od { background: var(--red-soft); color: var(--red); border-color: #eec5c1; font-weight: 800; }
+#panel-onboard .milestone { font-weight: 600; color: var(--ink-soft); margin: 6px 0; }
+#panel-onboard .milestone.over { color: var(--red); font-weight: 700; }
+
+/* ============ hire cards ============ */
+#panel-onboard .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+#panel-onboard .hire-card { cursor: pointer; transition: transform .15s, box-shadow .15s; }
+#panel-onboard .hire-card:hover { transform: translateY(-2px); box-shadow: 0 16px 34px -16px rgba(20,46,34,.3); }
+#panel-onboard .hc-top { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+#panel-onboard .hc-id { flex: 1; min-width: 0; }
+#panel-onboard .bp-avatar {
+  width: 52px; height: 52px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: 21px; font-weight: 800;
+  background: var(--terra); color: #f2e8c9;
+  box-shadow: inset 0 0 0 3px rgba(255,255,255,.15);
+}
+#panel-onboard .bp-name { font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
+#panel-onboard .ring { flex: none; }
+#panel-onboard .ring-track { fill: none; stroke: #e8e2cf; stroke-width: 6; }
+#panel-onboard .ring-fill { fill: none; stroke: var(--green); stroke-width: 6; }
+#panel-onboard .ring-num { font-family: var(--mono); font-size: 15px; font-weight: 800; fill: var(--ink); }
+#panel-onboard .minis { display: flex; gap: 6px; margin: 10px 0 4px; }
+#panel-onboard .mini { flex: 1; height: 7px; background: #e8e2cf; position: relative; }
+#panel-onboard .mini i { position: absolute; top: 0; bottom: 0; left: 0; background: var(--green); }
+#panel-onboard .bp-status { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+
+/* ============ journey timeline ============ */
+#panel-onboard .journey {
+  display: flex; align-items: flex-start; margin: 22px 0 8px; padding: 0 6px;
+}
+#panel-onboard .station { flex: 1; text-align: center; position: relative; padding-top: 26px; }
+#panel-onboard .station::before {
+  content: ""; position: absolute; top: 12px; left: -50%; width: 100%; height: 3px;
+  background: #ddd5ba;
+}
+#panel-onboard .station:first-child::before { display: none; }
+#panel-onboard .station.done::before { background: var(--green); }
+#panel-onboard .pin {
+  position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+  width: 19px; height: 19px; border-radius: 50%;
+  background: #fff; border: 3px solid #c9c0a4;
+}
+#panel-onboard .station.done .pin { background: var(--green); border-color: var(--green); }
+#panel-onboard .station.now .pin { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 0 5px rgba(184,134,46,.2); }
+#panel-onboard .s-label { font-size: 13px; font-weight: 800; }
+#panel-onboard .s-count { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+/* ============ hire detail ============ */
+#panel-onboard .detail-head { display: flex; align-items: center; gap: 16px; margin-bottom: 6px; flex-wrap: wrap; }
+#panel-onboard .detail-avatar {
+  width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 26px; font-weight: 800; background: var(--terra); color: #f2e8c9; flex: none;
+}
+#panel-onboard .detail-head h2 { margin: 0; font-size: 24px; letter-spacing: -.5px; }
+#panel-onboard .detail-progress { margin-left: auto; min-width: 220px; }
+#panel-onboard .bar { height: 8px; background: #e8e2cf; margin-top: 6px; }
+#panel-onboard .bar > div { height: 100%; background: var(--green); }
+#panel-onboard .phase-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin: 20px 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--terra);
+}
+#panel-onboard .phase-head strong { font-size: 15px; letter-spacing: .4px; }
+#panel-onboard .task {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: #fff; border: 1px solid var(--line); padding: 12px 14px; margin-bottom: 8px;
+}
+#panel-onboard .task input[type="checkbox"] {
+  width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--terra); cursor: pointer;
+}
+#panel-onboard .task.done { opacity: .62; }
+#panel-onboard .task.done .t-title { text-decoration: line-through; }
+#panel-onboard .task.od { border-left: 4px solid var(--red); }
+#panel-onboard .t-main { flex: 1; min-width: 0; }
+#panel-onboard .t-title { font-weight: 700; font-size: 14.5px; }
+#panel-onboard .meta { font-size: 13px; color: var(--muted); margin-top: 5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#panel-onboard .meta em { color: var(--ink-soft); }
+#panel-onboard .t-cat { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); }
+#panel-onboard .owner-select {
+  font-size: 12.5px; font-weight: 700; padding: 4px 8px; width: auto;
+  background: var(--green-soft); border: 1.5px solid #bfe3cb; color: var(--terra);
+}
+#panel-onboard .doc-note {
+  border: 1.5px solid var(--gold); background: #faf1dc; color: #6b4d15;
+  padding: 12px 16px; font-size: 13.5px; margin-bottom: 14px;
+}
+#panel-onboard .welcome-box {
+  background: var(--paper); border: 1px solid var(--line); border-left: 4px solid var(--gold);
+  padding: 14px 18px; margin: 12px 0; font-size: 14px; white-space: pre-wrap;
+}
+
+/* ============ notes & pulse ============ */
+#panel-onboard .notes-sect { margin-top: 22px; border-top: 2px dashed var(--line); padding-top: 14px; }
+#panel-onboard .notes-sect h3 { margin: 0 0 12px; font-size: 16px; }
+#panel-onboard .note-add { margin-bottom: 12px; }
+#panel-onboard .note-item {
+  background: #fff; border: 1px solid var(--line); padding: 10px 14px; margin-bottom: 8px;
+  display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
+}
+#panel-onboard .note-text { font-size: 14px; flex: 1; }
+#panel-onboard .note-meta { display: flex; gap: 10px; align-items: center; flex: none; }
+
+/* ============ lists & nudges ============ */
+#panel-onboard .list-item {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14.5px;
+}
+#panel-onboard .list-item:last-child { border-bottom: none; }
+#panel-onboard .nudge-card { border-top-color: var(--gold); }
+#panel-onboard .nudge-item { align-items: flex-start; }
+
+
+/* ============ print ============ */
+
+/* ============ motion ============ */
+@media (prefers-reduced-motion: no-preference) {
+  #panel-onboard .view.active { animation: fadein .25s ease both; }
+  #panel-onboard .hire-card { animation: rise .3s ease both; }
+}
+
+/* ============ responsive ============ */
+@media (max-width: 860px) {
+  #panel-onboard .detail-progress { margin-left: 0; width: 100%; }
+  #panel-onboard .journey { flex-direction: column; gap: 14px; }
+  #panel-onboard .station { text-align: left; padding: 0 0 0 34px; }
+  #panel-onboard .station::before { left: 9px; top: -14px; width: 3px; height: 100%; }
+  #panel-onboard .station:first-child::before { display: none; }
+  #panel-onboard .pin { left: 0; top: 0; transform: none; }
+}
+
+/* onboarding print: checklist only */
+@media print {
+  .topbar, footer, #panel-onboard .opnav, #panel-onboard .form-row,
+  #panel-onboard .btn, #panel-onboard .note-add, #panel-onboard .nudge-card { display: none !important; }
+  body.print-op-hire #panel-onboard .view { display: none; }
+  body.print-op-hire #panel-onboard #view-dashboard { display: block; }
+}

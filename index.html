@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HireWise AI — job posts + resume screening for small business</title>
+<title>HireWise AI — the hire-to-onboard suite for small business</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,11 +15,12 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="brand"><span class="brand-mark">H</span><span class="brand-name">HireWise <em>AI</em></span></div>
-    <p class="tagline">Write job posts that attract great people. Screen applicants in seconds. All local — nothing leaves your browser.</p>
+    <p class="tagline">Job post → resume screen → pipeline → offer → first 30 days. One hire record, end to end. All local — nothing leaves your browser.</p>
     <nav class="tabs" aria-label="Workspace">
       <button class="tab active" data-panel="panel-post">Write a post</button>
       <button class="tab" data-panel="panel-screen">Screen resumes</button>
       <button class="tab" data-panel="panel-pipe">Pipeline <span id="pipeCount" class="tab-count"></span></button>
+      <button class="tab" data-panel="panel-onboard">Onboard <span id="onboardCount" class="tab-count"></span></button>
     </nav>
     <span class="local-pill"><i></i>Local only</span>
   </div>
@@ -123,6 +124,29 @@
     <div id="stallOut"></div>
     <div id="pipeOut" class="pipeline"></div>
   </section>
+
+  <!-- ============ ONBOARDING (merged from OnboardPilot AI) ============ -->
+  <section id="panel-onboard" class="panel">
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Onboarding</p>
+        <h1>Day 1 to Day 30, handled</h1>
+        <p class="page-sub">Hired someone from the pipeline? Start their onboarding in one click — or add a hire directly. Day 1 / Week 1 / Day 30 checklists, buddies, milestones. Saved in this browser.</p>
+      </div>
+    </div>
+    <nav class="opnav" aria-label="Onboarding">
+      <button data-view="dashboard" class="active">Dashboard</button>
+      <button data-view="hires">New hire</button>
+      <button data-view="buddies">Buddies</button>
+      <button data-view="roles">Roles</button>
+      <button data-view="settings">Settings</button>
+    </nav>
+    <section id="view-dashboard" class="view active"></section>
+    <section id="view-hires" class="view"></section>
+    <section id="view-buddies" class="view"></section>
+    <section id="view-roles" class="view"></section>
+    <section id="view-settings" class="view"></section>
+  </section>
 </main>
 
 <div id="docModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="docTitle">
@@ -146,5 +170,7 @@
 <script src="js/logic.js"></script>
 <script src="js/samples.js"></script>
 <script src="js/app.js"></script>
+<script src="js/onboard.js"></script>
+<script src="js/onboard-ui.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HireWise AI smoke tests — 12 checks
+# HireWise AI smoke tests — hiring suite (post + screen + pipeline + onboard)
 set -u
 cd "$(dirname "$0")/.." || exit 1
 PASS=0; FAIL=0
@@ -140,6 +140,146 @@ grep -q 'class="shell"' index.html && grep -q 'local-pill' index.html \
   && ok "index.html uses sidebar shell" || bad "index.html missing shell"
 ! grep -E 'border-radius:[[:space:]]*[1-9]' css/style.css | grep -qv '50%' \
   && ok "no rounded edges in CSS" || bad "rounded edges found in CSS"
+
+# ============ onboarding module (merged from OnboardPilot AI) ============
+
+# 21-23: onboarding files exist + syntax
+for f in js/onboard.js js/onboard-ui.js; do
+  [ -f "$f" ] && ok "file exists: $f" || bad "missing: $f"
+done
+node --check js/onboard.js 2>/dev/null && node --check js/onboard-ui.js 2>/dev/null \
+  && ok "syntax ok: js/onboard.js + js/onboard-ui.js" || bad "syntax error in onboarding JS"
+
+# 24: onboarding logic exports (Node)
+node -e "
+const OP=require('./js/onboard.js');
+['generateChecklist','addHire','getHire','setItemDone','dashboard','progressFor','progressAll','isOverdue','addBuddy','getBuddyName','draftWelcomeMessage','hiresToCSV','archiveHire','unarchiveHire','archivedHires','createCustomRole','addCustomTask','allRoles','taskDue','taskOverdue','overdueTasks','milestoneStatus','nextMilestoneFor','upcomingMilestones','buddyCheckins','addHirePulse','hirePulses','pulseAverage','addHireNote','searchHires','sortHires','daysToStart','startLabel','PHASES','ROLE_TEMPLATES','STORAGE_KEY'].forEach(f=>{
+  if(typeof OP[f]==='undefined') throw new Error('missing '+f);
+});
+if(OP.STORAGE_KEY!=='onboardpilot_v1') throw new Error('storage key changed — existing data would be lost');
+" && ok "onboard.js exports full API + keeps onboardpilot_v1 storage key" || bad "onboard.js exports/storage key broken"
+
+# 25: 6 built-in role templates, 3 phases, >=3 tasks each
+node -e "
+const OP=require('./js/onboard.js');
+const roles=Object.keys(OP.ROLE_TEMPLATES);
+if(roles.length<6) throw new Error('fewer than 6 roles');
+for(const r of roles){
+  const cl=OP.generateChecklist(r,{});
+  for(const ph of OP.PHASES){
+    if(cl.filter(t=>t.phase===ph).length<3) throw new Error(r+'/'+ph+' thin');
+  }
+}
+" && ok "6 built-in role templates, 3 phases x >=3 tasks" || bad "role templates broken"
+
+# 26: Day-1 doc items carry the generic-guidance note
+node -e "
+const OP=require('./js/onboard.js');
+const cl=OP.generateChecklist('Retail Associate',{});
+const docs=cl.filter(t=>t.doc);
+if(docs.length<4) throw new Error('doc items missing');
+if(docs.some(t=>!t.guidance||!/Generic guidance only/.test(t.guidance))) throw new Error('doc without note');
+if(cl.filter(t=>!t.doc).some(t=>t.guidance)) throw new Error('non-doc has guidance');
+" && ok "Day-1 document items carry generic-guidance note" || bad "doc guidance note broken"
+
+# 27: progress math + overdue detection
+node -e "
+const OP=require('./js/onboard.js');
+const st=OP.blankState();
+const past=OP.addHire(st,'Past','Barista','2026-01-05',null);
+if(!OP.isOverdue(past,'2026-09-28')) throw new Error('past not overdue');
+for(const t of past.checklist.filter(t=>t.phase==='day1')) OP.setItemDone(st,past.id,t.id,true);
+if(OP.isOverdue(past,'2026-09-28')) throw new Error('still overdue');
+const fake={checklist:[{phase:'day1',done:true},{phase:'day1',done:false},{phase:'day1',done:false},{phase:'day1',done:false}]};
+if(OP.progressFor(fake,'day1')!==25) throw new Error('1-of-4 != 25%');
+" && ok "onboarding progress math + overdue Day-1 detection" || bad "onboarding progress/overdue broken"
+
+# 28: buddy assignment + welcome message + serialize round-trip
+node -e "
+const OP=require('./js/onboard.js');
+const st=OP.blankState();
+const b=OP.addBuddy(st,'Maria Gomez','Senior Associate');
+const h=OP.addHire(st,'New Person','Barista','2026-09-28',b.id);
+if(OP.getBuddyName(st,h.id)!=='Maria Gomez') throw new Error('buddy mismatch');
+const r=OP.draftWelcomeMessage(st,h.id);
+if(r.source!=='local'||!/New Person/.test(r.message)||!/Maria Gomez/.test(r.message)) throw new Error('welcome bad');
+const s2=OP.deserialize(OP.serialize(st));
+if(s2.hires.length!==1||s2.hires[0].checklist.length!==h.checklist.length) throw new Error('round-trip');
+" && ok "buddy + welcome message + serialize round-trip" || bad "buddy/welcome/persist broken"
+
+# 29: milestones, task due dates, nudges, pulse
+node -e "
+const OP=require('./js/onboard.js');
+const st=OP.blankState();
+const b=OP.addBuddy(st,'Sam','Lead');
+const h=OP.addHire(st,'Nia','Line Cook','2026-09-01',b.id);
+if(OP.phaseDueDate(h,'day1')!=='2026-09-02') throw new Error('day1 due');
+if(OP.milestoneStatus(h,'2026-09-15')[0].state!=='overdue') throw new Error('milestone not overdue');
+const nudges=OP.buddyCheckins(st,'2026-09-15');
+if(nudges.length!==1||!/Sam/.test(nudges[0].text)) throw new Error('nudge bad');
+if(!OP.addHirePulse(st,h.id,4,'Settling in')) throw new Error('pulse');
+if(OP.pulseAverage(OP.hirePulses(st,h.id))!==4) throw new Error('pulse avg');
+const od=OP.overdueTasks(h,'2026-09-15');
+if(!od.length) throw new Error('overdueTasks empty');
+" && ok "milestones + per-task dues + buddy nudges + feedback pulse" || bad "milestone/nudge/pulse broken"
+
+# 30: custom roles + dashboard search/sort/CSV + archive
+node -e "
+const OP=require('./js/onboard.js');
+const st=OP.blankState();
+OP.createCustomRole(st,'Dog Walker',{day1:[{title:'Meet the pack'}],week1:[{title:'Learn routes'}],day30:[{title:'Solo walks'}]});
+if(!OP.generateChecklist('Dog Walker',st.customRoles)) throw new Error('custom role');
+OP.addHire(st,'Zoe Park','Barista','2026-09-28',null);
+const rows=OP.dashboard(st,'2026-09-28');
+if(OP.searchHires(rows,'zoe').length!==1) throw new Error('search');
+if(!/^Name,Role,Start date,Buddy/.test(OP.hiresToCSV(rows))) throw new Error('csv header');
+OP.archiveHire(st,rows[0].id);
+if(OP.dashboard(st,'2026-09-28').length!==0||OP.archivedHires(st).length!==1) throw new Error('archive');
+OP.unarchiveHire(st,rows[0].id);
+if(OP.dashboard(st,'2026-09-28').length!==1) throw new Error('restore');
+" && ok "custom roles + search/sort/CSV + archive lifecycle" || bad "custom roles/search/archive broken"
+
+# 31: Onboard tab wired in index.html
+grep -q 'id="panel-onboard"' index.html && grep -q 'data-panel="panel-onboard"' index.html \
+  && grep -q 'id="onboardCount"' index.html && grep -q 'class="opnav"' index.html \
+  && for v in dashboard hires buddies roles settings; do grep -q "id=\"view-$v\"" index.html || exit 1; done \
+  && ok "index.html has panel-onboard + opnav (5 views) + onboardCount" || bad "index.html missing onboard panel"
+
+# 32: onboarding scripts loaded
+grep -q 'js/onboard.js' index.html && grep -q 'js/onboard-ui.js' index.html \
+  && ok "index.html loads js/onboard.js + js/onboard-ui.js" || bad "onboarding scripts not loaded"
+
+# 33: pipeline → onboarding bridge wired
+grep -q 'data-onboard' js/app.js && grep -q 'data-viewon' js/app.js && grep -q '__hwOnboard' js/app.js \
+  && grep -q 'openOnboardModal' js/app.js && grep -q 'Start onboarding' js/app.js \
+  && ok "app.js wires Start onboarding / View onboarding bridge" || bad "pipeline→onboard bridge missing"
+grep -q 'window.__hwOnboard' js/onboard-ui.js && grep -q 'print-op-hire' js/onboard-ui.js \
+  && grep -q '#panel-onboard .opnav' js/onboard-ui.js \
+  && ok "onboard-ui.js exposes __hwOnboard bridge + scoped nav" || bad "onboard-ui.js bridge missing"
+
+# 34: onboarding CSS scoped under #panel-onboard, palette remapped
+grep -q '#panel-onboard .card' css/style.css && grep -q '#panel-onboard .opnav button.active' css/style.css \
+  && grep -q '#panel-onboard .task' css/style.css \
+  && ok "onboarding CSS scoped under #panel-onboard" || bad "onboarding CSS not scoped"
+! grep -E 'var\(--forest|--forest:' css/style.css \
+  && ok "no leftover forest palette vars in CSS" || bad "forest palette leaked into CSS"
+
+# 35: pipeline → onboarding bridge flow (Node, same hire record journey)
+node -e "
+const HW=require('./js/logic.js');
+const OP=require('./js/onboard.js');
+// hired candidate from the pipeline starts onboarding
+const c={name:'Maria Santos',role:'Line Cook',score:85,verdict:'strong'};
+HW.stampStage(c,'applied',1728259200000);
+HW.stampStage(c,'hired',1728259200000+864e5);
+const st=OP.blankState();
+const h=OP.addHire(st,c.name,c.role,'2026-12-01',null);
+if(!h) throw new Error('addHire failed');
+c.onboardId=h.id; // the link the UI stores
+if(h.checklist.filter(t=>t.phase==='day1').length<3) throw new Error('no day1 checklist');
+const dash=OP.dashboard(st,'2026-11-01');
+if(dash.length!==1||dash[0].name!=='Maria Santos') throw new Error('dashboard');
+" && ok "pipeline hire → onboarding checklist on one journey" || bad "bridge flow broken"
 
 echo "---- smoke: $PASS passed, $FAIL failed ----"
 [ "$FAIL" -eq 0 ]

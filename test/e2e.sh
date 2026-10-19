@@ -63,6 +63,99 @@ const f=HW.redFlags({},'');
 if(!p.professional||typeof r.score!=='number'||!f.length) process.exit(1);
 " && ok "flow6: empty inputs handled gracefully" || bad "flow6 failed"
 
+# ============ onboarding flows (merged from OnboardPilot AI) ============
+
+# Flow 7b: onboard hire lifecycle — create, check items, 100%
+node -e "
+const OP=require('./js/onboard.js');
+const st=OP.blankState();
+const h=OP.addHire(st,'Lena Wu','Barista','2026-09-28',null);
+if(OP.progressAll(h).overall!==0) process.exit(1);
+for(const t of h.checklist) OP.setItemDone(st,h.id,t.id,true);
+const p=OP.progressAll(h);
+if(p.overall!==100||p.day1!==100||p.week1!==100||p.day30!==100) {console.error(p);process.exit(1);}
+" && ok "flow7b: onboarding hire lifecycle to 100%" || bad "flow7b failed"
+
+# Flow 7c: milestone due dates anchored on start date + upcoming across hires
+node -e "
+const OP=require('./js/onboard.js');
+const st=OP.blankState();
+const h=OP.addHire(st,'Nora','Barista','2026-09-28',null);
+if(OP.phaseDueDate(h,'day1')!=='2026-09-29') process.exit(1);
+if(OP.phaseDueDate(h,'week1')!=='2026-10-05') process.exit(1);
+if(OP.phaseDueDate(h,'day30')!=='2026-10-28') process.exit(1);
+let ms=OP.milestoneStatus(h,'2026-10-01');
+if(ms[0].state!=='overdue') process.exit(1);
+if(OP.milestoneLabel(ms[0])!=='Day 1 overdue by 2 days') process.exit(1);
+h.checklist.filter(t=>t.phase==='day1').forEach(t=>OP.setItemDone(st,h.id,t.id,true));
+if(OP.dashboard(st,'2026-09-27')[0].nextMilestone.phase!=='week1') process.exit(1);
+const h2=OP.addHire(st,'Later','Barista','2026-10-20',null);
+const up=OP.upcomingMilestones(st,'2026-09-27');
+if(up.length!==2||up[0].hireName!=='Nora') process.exit(1);
+" && ok "flow7c: milestone due dates + upcoming milestones" || bad "flow7c failed"
+
+# Flow 7d: buddy nudge → owner reassign → pulse end-to-end
+node -e "
+const OP=require('./js/onboard.js');
+const st=OP.blankState();
+const b=OP.addBuddy(st,'Rosa','Senior');
+const h=OP.addHire(st,'Nia','Line Cook','2026-09-01',b.id);
+if(!OP.buddyCheckins(st,'2026-09-15').length) process.exit(1);
+h.checklist.filter(t=>t.owner==='Buddy'&&!t.done).forEach(t=>{
+  if(!OP.setItemOwner(st,h.id,t.id,'Manager')) process.exit(1);
+});
+if(OP.buddyCheckins(st,'2026-09-15').length) process.exit(1);
+OP.addHirePulse(st,h.id,3,'Slow start, watching closely');
+const ps=OP.hirePulses(st,h.id);
+if(ps.length!==1||ps[0].score!==3||OP.pulseAverage(ps)!==3) process.exit(1);
+OP.addHireNote(st,h.id,'First impression: solid');
+if(OP.hireNotes(st,h.id).length!==1) process.exit(1);
+" && ok "flow7d: nudge → owner reassign → pulse → note" || bad "flow7d failed"
+
+# Flow 7e: custom role flow + CSV export + archive round-trip
+node -e "
+const OP=require('./js/onboard.js');
+const st=OP.blankState();
+OP.createCustomRole(st,'Bike Mechanic',{day1:[{title:'Shop tour',category:'Culture',owner:'Buddy'}]});
+OP.addCustomTask(st,'Bike Mechanic','week1','Fix first flat','Training','Buddy');
+OP.addCustomTask(st,'Bike Mechanic','day30','Solo service','Training','New hire');
+const h=OP.addHire(st,'Rico','Bike Mechanic','2026-09-28',null);
+const counts=[OP.countsFor(h,'day1').total,OP.countsFor(h,'week1').total,OP.countsFor(h,'day30').total];
+if(counts.join(',')!=='1,1,1') process.exit(1);
+const csv=OP.hiresToCSV(OP.dashboard(st,'2026-09-28'));
+if(!csv.includes('Rico')||!csv.includes('Bike Mechanic')) process.exit(1);
+OP.archiveHire(st,h.id);
+const st2=OP.deserialize(OP.serialize(st));
+if(!OP.archivedHires(st2).some(x=>x.id===h.id)) process.exit(1);
+" && ok "flow7e: custom role + CSV + archive persist" || bad "flow7e failed"
+
+# Flow 7f: full suite journey — post → screen → pipeline → hire → onboard
+node -e "
+const HW=require('./js/logic.js');
+const OP=require('./js/onboard.js');
+// post
+const d={role:'Line Cook',company:'Sunny Side',location:'Austin, TX',payMin:'18',payMax:'24',payType:'hourly',mustHaves:['Food safety cert','Weekend availability'],niceToHaves:[]};
+const p=HW.generatePosts(d);
+if(!p.professional.includes('Line Cook')) process.exit(1);
+// screen
+const r=HW.screenResume({role:'Line Cook',resumeText:'Maria Santos — line cook, 4 years experience. ServSafe certified food safety. Available weekends.',mustHaves:['food safety','weekend availability']});
+if(r.verdict!=='strong') process.exit(1);
+// pipeline
+const c={name:'Maria Santos',role:'Line Cook',score:r.score,verdict:r.verdict};
+HW.stampStage(c,'applied',1728259200000);
+HW.stampStage(c,'hired',1728259200000+864e5);
+if(HW.stalledCandidates([c],7,1728259200000+864e5).length) process.exit(1);
+// offer
+const L=HW.offerLetter({name:c.name,role:c.role,company:'Sunny Side',pay:'22',payType:'hourly',startDate:'2026-12-01',manager:'Pat'});
+if(!/Line Cook/.test(L)||!/2026-12-01/.test(L)) process.exit(1);
+// onboard on the same journey
+const st=OP.blankState();
+const h=OP.addHire(st,c.name,c.role,'2026-12-01',null);
+c.onboardId=h.id;
+if(!h||OP.progressAll(h).overall!==0) process.exit(1);
+if(OP.dashboard(st,'2026-11-20')[0].startIn!==11) process.exit(1);
+" && ok "flow7f: post → screen → pipeline → offer → onboarding, one journey" || bad "flow7f failed"
+
 # Flow 7: all 3 bundled samples are distinct people
 node -e "
 const fs=require('fs');
