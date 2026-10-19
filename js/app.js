@@ -111,7 +111,7 @@
   let scoringId = null; // candidate index with the scorecard form open
   let cmpSel = [];      // candidate indices ticked for side-by-side compare
   function loadPipe() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } }
-  function savePipe(p) { localStorage.setItem(KEY, JSON.stringify(p)); renderPipe(); }
+  function savePipe(p) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) { /* storage blocked — keep in-memory state */ } renderPipe(); }
   function addCandidate(c) { const p = loadPipe(); HW.stampStage(c, c.stage || "applied", c.ts || Date.now()); p.push(c); savePipe(p); }
   window.__hwAddCandidate = addCandidate; // for tests
 
@@ -185,9 +185,10 @@
     renderPipeStats();
     $("pipeCount").textContent = p.length ? p.length : "";
     const iv = (c) => (c.interview && c.interview.pct != null ? c.interview.pct + "%" : "—");
+    const rScore = (c) => (typeof c.score === "number" && isFinite(c.score) ? c.score + "/100" : "—");
     const rows = [
       ["Role", a.role, b.role],
-      ["Resume score", a.score + "/100", b.score + "/100"],
+      ["Resume score", rScore(a), rScore(b)],
       ["Verdict", a.verdict, b.verdict],
       ["Stage", STAGE_LABEL[a.stage] || a.stage, STAGE_LABEL[b.stage] || b.stage],
       ["Interview", iv(a), iv(b)],
