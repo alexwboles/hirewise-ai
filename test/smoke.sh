@@ -281,5 +281,81 @@ const dash=OP.dashboard(st,'2026-11-01');
 if(dash.length!==1||dash[0].name!=='Maria Santos') throw new Error('dashboard');
 " && ok "pipeline hire → onboarding checklist on one journey" || bad "bridge flow broken"
 
+
+# ============ v2 "Talent Office" — interviews, dossier, bulk, conversion ============
+
+# 36: logic exports interview + journal + conversion API
+node -e "const HW=require('./js/logic.js'); ['scheduleInterview','removeInterview','interviewAt','upcomingInterviews','addNoteToLog','stageConversion','INTERVIEW_TYPES'].forEach(f=>{ if(typeof HW[f]==='undefined') throw new Error('missing '+f); });" \
+  && ok "logic exports interview/journal/conversion API" || bad "v2 logic exports missing"
+
+# 37: interview scheduling — valid accepted, bad date/time rejected, upcoming ordered
+node -e "
+const HW=require('./js/logic.js');
+const c={name:'A'};
+if(HW.scheduleInterview(c,{date:'not-a-date'})!==null) process.exit(1);
+if(HW.scheduleInterview(c,{date:'2026-11-03',time:'25:99'})!==null) process.exit(1);
+if(HW.scheduleInterview(null,{date:'2026-11-03'})!==null) process.exit(1);
+const iv=HW.scheduleInterview(c,{date:'2026-11-03',time:'10:30',type:'video',interviewer:'Pat',notes:'Round 1'});
+if(!iv||iv.type!=='video'||iv.interviewer!=='Pat') process.exit(1);
+const iv2=HW.scheduleInterview(c,{date:'2026-11-01'});
+const now=new Date('2026-10-25T12:00:00').getTime();
+const up=HW.upcomingInterviews([c],now);
+if(up.length!==2||up[0].interview.date!=='2026-11-01') {console.error(up);process.exit(1);}
+// past interviews are excluded
+if(HW.upcomingInterviews([c],new Date('2026-12-01T12:00:00').getTime()).length!==0) process.exit(1);
+if(!HW.removeInterview(c,iv2.id)||c.interviews.length!==1) process.exit(1);
+if(HW.removeInterview(c,'nope')!==false) process.exit(1);
+" && ok "scheduleInterview/upcomingInterviews/removeInterview" || bad "interview scheduling broken"
+
+# 38: notes journal + stage conversion funnel
+node -e "
+const HW=require('./js/logic.js');
+const c={name:'B'};
+const e=HW.addNoteToLog(c,'Strong portfolio',{});
+if(e===undefined) process.exit(1);
+const n=HW.addNoteToLog(c,'Called twice',1728259200000);
+if(!n||n.at!==1728259200000||c.noteLog.length!==2) process.exit(1);
+if(HW.addNoteToLog(c,'   ')!==null) process.exit(1);
+const cs=[
+  {stage:'hired',stageLog:[{stage:'applied',at:1},{stage:'screening',at:2},{stage:'interview',at:3},{stage:'offer',at:4},{stage:'hired',at:5}]},
+  {stage:'screening',stageLog:[{stage:'applied',at:1},{stage:'screening',at:2}]},
+  {stage:'applied'}
+];
+const conv=HW.stageConversion(cs);
+if(conv.applied.entered!==3||conv.applied.advanced!==2||conv.applied.pct!==67) {console.error(conv.applied);process.exit(1);}
+if(conv.screening.entered!==2||conv.screening.advanced!==1||conv.screening.pct!==50) process.exit(1);
+if(conv.interview.entered!==1||conv.interview.advanced!==1||conv.interview.pct!==100) process.exit(1);
+if(conv.offer.entered!==1||conv.offer.advanced!==1) process.exit(1);
+const empty=HW.stageConversion([]);
+if(empty.applied.pct!==null||empty.applied.entered!==0) process.exit(1);
+" && ok "addNoteToLog + stageConversion funnel math" || bad "journal/conversion broken"
+
+# 39: profile drawer + DnD + bulk wiring in app.js
+grep -q 'profileDrawer' js/app.js && grep -q 'openProfile' js/app.js && grep -q 'data-profile' js/app.js \
+  && grep -q 'dropCandidate' js/app.js && grep -q 'draggable="true"' js/app.js && grep -q 'data-dragidx' js/app.js \
+  && grep -q 'data-bulk' js/app.js && grep -q 'bulkApply' js/app.js && grep -q 'renderBulkBar' js/app.js \
+  && grep -q 'renderIvStrip' js/app.js && grep -q 'HW.upcomingInterviews' js/app.js \
+  && ok "app.js wires drawer + drag-drop + bulk + interview strip" || bad "app.js missing v2 pipeline wiring"
+
+# 40: drawer scorecard + interview form + journal wiring in app.js
+grep -q 'data-scoresave2' js/app.js && grep -q 'data-dsc' js/app.js && grep -q 'data-ivadd' js/app.js \
+  && grep -q 'data-ivdel' js/app.js && grep -q 'data-noteadd' js/app.js && grep -q 'scheduleInterview' js/app.js \
+  && grep -q 'stageConversion' js/app.js && grep -q 'addNoteToLog' js/app.js \
+  && ok "app.js wires drawer scorecard/interviews/journal" || bad "app.js missing drawer section wiring"
+
+# 41: index.html has drawer + interview strip + bulk bar + Fraunces
+grep -q 'id="profileDrawer"' index.html && grep -q 'id="drawerScrim"' index.html \
+  && grep -q 'id="ivOut"' index.html && grep -q 'id="bulkBar"' index.html && grep -q 'id="bulkStage"' index.html \
+  && grep -q 'Fraunces' index.html && grep -q 'id="drawerTitle"' index.html \
+  && ok "index.html has drawer/strip/bulkbar/Fraunces" || bad "index.html missing v2 elements"
+
+# 42: dossier CSS present, still zero rounded edges
+grep -q '\.drawer\.open' css/style.css && grep -q '\.dossier-sect' css/style.css \
+  && grep -q '\.iv-strip' css/style.css && grep -q '\.bulk-bar' css/style.css \
+  && grep -q '\.conv' css/style.css && grep -q '\-\-brass' css/style.css \
+  && ok "CSS has drawer/strip/bulk/conv/brass" || bad "v2 CSS selectors missing"
+! grep -E 'border-radius:[[:space:]]*[1-9]' css/style.css | grep -qv '50%' \
+  && ok "no rounded edges in v2 CSS" || bad "rounded edges found in v2 CSS"
+
 echo "---- smoke: $PASS passed, $FAIL failed ----"
 [ "$FAIL" -eq 0 ]

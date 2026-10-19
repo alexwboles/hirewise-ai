@@ -425,7 +425,103 @@
     return { subject, body, tone };
   }
 
+  // ---- interview scheduling (stored on the candidate, local only) ----
+  const INTERVIEW_TYPES = ["phone", "video", "onsite"];
+  // iv: { date: "YYYY-MM-DD", time: "HH:MM" (optional), type, interviewer, notes }
+  // Returns the entry, or null when the date is invalid.
+  function scheduleInterview(c, iv) {
+    if (!c) return null;
+    iv = iv || {};
+    const date = String(iv.date || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    const time = String(iv.time || "").trim();
+    if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return null;
+    const type = INTERVIEW_TYPES.indexOf(iv.type) !== -1 ? iv.type : "phone";
+    c.interviews = Array.isArray(c.interviews) ? c.interviews : [];
+    const entry = {
+      id: "iv" + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36),
+      date, time, type,
+      interviewer: String(iv.interviewer || "").trim(),
+      notes: String(iv.notes || "").trim(),
+      done: false,
+    };
+    c.interviews.push(entry);
+    return entry;
+  }
+  function removeInterview(c, id) {
+    if (!c || !Array.isArray(c.interviews)) return false;
+    const i = c.interviews.findIndex((x) => x.id === id);
+    if (i === -1) return false;
+    c.interviews.splice(i, 1);
+    return true;
+  }
+  function interviewAt(iv) {
+    if (!iv || !iv.date) return null;
+    const ms = new Date(iv.date + "T" + (iv.time || "09:00") + ":00").getTime();
+    return isFinite(ms) ? ms : null;
+  }
+  // Upcoming (non-past) interviews across candidates, soonest first.
+  // Returns [{ candidate, interview, at }]. Additive: old candidates without
+  // an `interviews` array simply contribute nothing.
+  function upcomingInterviews(candidates, nowMs, limit) {
+    const now = nowMs == null ? Date.now() : nowMs;
+    const out = [];
+    for (const c of candidates || []) {
+      for (const iv of c.interviews || []) {
+        const at = interviewAt(iv);
+        if (at == null || at < now) continue;
+        out.push({ candidate: c, interview: iv, at });
+      }
+    }
+    out.sort((a, b) => a.at - b.at);
+    return limit != null ? out.slice(0, limit) : out;
+  }
+
+  // ---- candidate notes journal (timestamped entries; legacy `notes` string untouched) ----
+  function addNoteToLog(c, text, atMs) {
+    const t = String(text || "").trim();
+    if (!c || !t) return null;
+    c.noteLog = Array.isArray(c.noteLog) ? c.noteLog : [];
+    const entry = {
+      id: "n" + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36),
+      at: atMs == null ? Date.now() : atMs,
+      text: t,
+    };
+    c.noteLog.push(entry);
+    return entry;
+  }
+
+  // ---- stage conversion funnel: per live stage, % of entered candidates that moved on ----
+  function stageConversion(candidates) {
+    const stages = ["applied", "screening", "interview", "offer"];
+    const out = {};
+    for (const s of stages) out[s] = { entered: 0, advanced: 0, pct: null };
+    for (const c of candidates || []) {
+      const log = Array.isArray(c.stageLog) && c.stageLog.length
+        ? c.stageLog.map((x) => x.stage)
+        : [c.stage].filter(Boolean);
+      const seen = [];
+      for (const s of log) if (seen[seen.length - 1] !== s) seen.push(s);
+      for (const s of stages) {
+        const i = seen.indexOf(s);
+        if (i === -1) continue;
+        out[s].entered++;
+        const next = seen[i + 1];
+        // advancing means moving forward to a later stage that is not an exit;
+        // "rejected" ends the funnel, "hired" advances "offer".
+        if (next && PIPE_STAGES.indexOf(next) > PIPE_STAGES.indexOf(s) && next !== "rejected") out[s].advanced++;
+      }
+    }
+    for (const s of stages) {
+      const e = out[s].entered;
+      out[s].pct = e ? Math.round((out[s].advanced / e) * 100) : null;
+    }
+    return out;
+  }
+
   return { generatePosts, redFlags, screenResume, mentions, norm, payLine,
     pipeStats, pipelineToCSV, PIPE_STAGES, TERMINAL_STAGES, SCORE_CATS, scoreInterview,
-    stampStage, daysInStage, stalledCandidates, offerLetter, rejectionEmail };
+    stampStage, daysInStage, stalledCandidates, offerLetter, rejectionEmail,
+    INTERVIEW_TYPES, scheduleInterview, removeInterview, interviewAt, upcomingInterviews,
+    addNoteToLog, stageConversion };
 });

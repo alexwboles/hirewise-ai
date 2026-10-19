@@ -97,7 +97,9 @@
       <button id="addToPipe" class="primary">Add to pipeline →</button>`;
     $("addToPipe").addEventListener("click", () => {
       const name = $("candName").value.trim() || "Unnamed candidate";
-      addCandidate({ name, role: input.role || "—", score: r.score, verdict: r.verdict, stage: "applied", ts: Date.now() });
+      addCandidate({ name, role: input.role || "—", score: r.score, verdict: r.verdict,
+        stage: "applied", ts: Date.now(),
+        evidence: r.evidence, questions: r.questions, matched: r.matched, missing: r.missing });
       document.querySelector('[data-panel="panel-pipe"]').click();
     });
   }
@@ -108,10 +110,19 @@
   const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
   const STAGE_LABEL = { applied: "Applied", screening: "Screening", interview: "Interview",
     offer: "Offer", hired: "Hired", rejected: "Rejected" };
-  let scoringId = null; // candidate index with the scorecard form open
-  let cmpSel = [];      // candidate indices ticked for side-by-side compare
+  let cmpSel = [];       // candidate indices ticked for side-by-side compare
+  let bulkSel = [];      // candidate indices ticked for bulk actions
+  let profileIdx = null; // candidate index open in the profile drawer
   function loadPipe() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } }
-  function savePipe(p) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) { /* storage blocked — keep in-memory state */ } renderPipe(); }
+  function savePipe(p) {
+    try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) { /* storage blocked — keep in-memory state */ }
+    renderPipe(); renderIvStrip();
+    if (profileIdx !== null) {
+      const pl = loadPipe();
+      if (pl[profileIdx]) renderDrawer(pl, pl[profileIdx]);
+      else closeProfile();
+    }
+  }
   function addCandidate(c) { const p = loadPipe(); HW.stampStage(c, c.stage || "applied", c.ts || Date.now()); p.push(c); savePipe(p); }
   window.__hwAddCandidate = addCandidate; // for tests
 
@@ -130,11 +141,6 @@
       `<span class="pstat">Avg score <strong>${s.avgScore == null ? "—" : s.avgScore}</strong></span>`;
   }
 
-  function ivChip(c) {
-    return c.interview && c.interview.pct != null
-      ? `<span class="score-chip iv" title="Interview scorecard">IV ${c.interview.pct}%</span>` : "";
-  }
-
   function stageChip(c, st) {
     if (HW.TERMINAL_STAGES.indexOf(st) !== -1) return "";
     const d = HW.daysInStage(c);
@@ -142,34 +148,24 @@
   }
 
   function cardHtml(c, i, st) {
-    if (scoringId === i) {
-      return `<div class="card verdict-${c.verdict}">
-        <strong>${escapeHtml(c.name)}</strong>
-        <div class="meta">Interview scorecard</div>
-        ${HW.SCORE_CATS.map((cat) =>
-          `<label class="sc-row">${cat.label} (×${cat.weight})
-            <select data-sc="${cat.id}">${[1, 2, 3, 4, 5].map((n) =>
-              `<option value="${n}"${c.interview && c.interview.ratings[cat.id] === n ? " selected" : ""}>${n}</option>`).join("")}
-            </select></label>`).join("")}
-        <div class="cardbtns">
-          <button data-scoresave="${i}" class="primary">Save score</button>
-          <button data-scorecancel>Cancel</button>
-        </div></div>`;
-    }
     const terminal = st === "hired" || st === "rejected";
     const scoreChip = (typeof c.score === "number" && isFinite(c.score))
       ? `<span class="score-chip">${c.score}</span>` : `<span class="score-chip unscored">new</span>`;
-    return `<div class="card verdict-${c.verdict}">
-       <strong>${escapeHtml(c.name)}</strong>
-       <div class="meta">${escapeHtml(c.role)}${scoreChip}${ivChip(c)}${stageChip(c, st)}</div>
+    const iv = c.interview && c.interview.pct != null;
+    const ivCount = (c.interviews || []).length;
+    return `<div class="card verdict-${c.verdict}" draggable="true" data-dragidx="${i}">
+       <div class="card-top">
+         <button class="cardname" data-profile="${i}" title="Open candidate dossier">${escapeHtml(c.name)}</button>
+         <label class="bulk-check" title="Select for bulk actions"><input type="checkbox" data-bulk="${i}"${bulkSel.includes(i) ? " checked" : ""} aria-label="Select ${escapeHtml(c.name)}"></label>
+       </div>
+       <div class="meta">${escapeHtml(c.role)}${scoreChip}${iv ? `<span class="score-chip iv" title="Interview scorecard">IV ${c.interview.pct}%</span>` : ""}${ivCount ? `<span class="score-chip cal" title="Scheduled interviews">${ivCount} int.</span>` : ""}${stageChip(c, st)}</div>
        ${c.notes ? `<div class="pnote">${escapeHtml(c.notes)}</div>` : ""}
        <div class="cardbtns">
          ${!terminal && st !== "applied" ? `<button data-mv="${i}|back" aria-label="Move back">←</button>` : ""}
          ${!terminal ? `<button data-mv="${i}|fwd" aria-label="Move forward">→</button>` : ""}
-         ${st === "hired" ? `<span class="hired-tag">★ hired</span> <button data-offer="${i}">Offer letter</button> ${c.onboardId ? `<button data-viewon="${i}">View onboarding</button>` : `<button data-onboard="${i}" class="primary">Start onboarding</button>`}` : ""}
+         <button data-profile="${i}">Dossier</button>
+         ${st === "hired" ? `<button data-offer="${i}">Offer letter</button> ${c.onboardId ? `<button data-viewon="${i}">View onboarding</button>` : `<button data-onboard="${i}" class="primary">Start onboarding</button>`}` : ""}
          ${st === "rejected" ? `<button data-rejmail="${i}">Rejection email</button>` : ""}
-         <button data-score="${i}">Score</button>
-         <button data-note="${i}">Notes</button>
          ${!terminal ? `<button data-reject="${i}" class="del">Reject</button>` : `<button data-reopen="${i}">Reopen</button>`}
          <button data-del="${i}" class="del">Delete</button>
        </div>
@@ -195,6 +191,7 @@
       ["Verdict", a.verdict, b.verdict],
       ["Stage", STAGE_LABEL[a.stage] || a.stage, STAGE_LABEL[b.stage] || b.stage],
       ["Interview", iv(a), iv(b)],
+      ["Scheduled", String((a.interviews || []).length), String((b.interviews || []).length)],
       ["Notes", a.notes || "—", b.notes || "—"],
     ];
     $("pipeOut").innerHTML =
@@ -207,9 +204,43 @@
     document.querySelector("[data-back-board]").addEventListener("click", () => { cmpSel = []; renderPipe(); });
   }
 
+  function renderBulkBar() {
+    const bar = $("bulkBar");
+    const sel = $("bulkStage");
+    if (!sel.options.length)
+      sel.innerHTML = STAGES.map((s) => `<option value="${s}">${STAGE_LABEL[s]}</option>`).join("");
+    if (!bulkSel.length) { bar.classList.add("hidden"); return; }
+    bar.classList.remove("hidden");
+    $("bulkCount").textContent = bulkSel.length + (bulkSel.length === 1 ? " candidate selected" : " candidates selected");
+  }
+
+  function emptyStateHtml() {
+    return `<div class="empty-state">
+      <p class="eyebrow">A clean desk</p>
+      <h3>No candidates in the pipeline yet</h3>
+      <p>Add your first candidate above, or score a resume on the
+      <a href="#" id="emptyGoScreen">Screen resumes</a> tab — strong fits land here automatically.</p>
+    </div>`;
+  }
+
+  // Drop a dragged card onto a column: stamps the stage, logs a rejection reason.
+  function dropCandidate(idx, targetStage) {
+    const pl = loadPipe();
+    const c = pl[idx];
+    if (!c || c.stage === targetStage || STAGES.indexOf(targetStage) === -1) return;
+    if (targetStage === "rejected") {
+      const reason = prompt("Rejection reason (logged on the candidate record):", "");
+      if (reason === null) return; // dropped by mistake — put it back
+      if (reason.trim()) HW.addNoteToLog(c, "Rejected: " + reason.trim());
+    }
+    HW.stampStage(c, targetStage);
+    savePipe(pl);
+  }
+
   function renderPipe() {
     const p = loadPipe();
     renderPipeStats();
+    renderBulkBar();
     $("pipeCount").textContent = p.length ? p.length : "";
     const obN = (window.__hwOnboard && typeof window.__hwOnboard.count === "function") ? window.__hwOnboard.count() : 0;
     const obT = $("onboardCount");
@@ -219,13 +250,47 @@
       ? `<div class="notice"><strong>Stalled.</strong> ` + stalled.map((s) =>
         `${escapeHtml(s.candidate.name)} — ${s.days} days in ${STAGE_LABEL[s.candidate.stage] || escapeHtml(s.candidate.stage)}`).join("; ") + "</div>"
       : "";
+    if (!p.length) {
+      $("pipeOut").innerHTML = emptyStateHtml();
+      const g = $("emptyGoScreen");
+      if (g) g.addEventListener("click", (e) => { e.preventDefault(); document.querySelector('[data-panel="panel-screen"]').click(); });
+      return;
+    }
+    const conv = HW.stageConversion(p);
     const filtered = p.map((c, i) => ({ c, i })).filter((x) => cardMatches(x.c));
     $("pipeOut").innerHTML = STAGES.map((st) => {
       const cards = filtered.filter((x) => x.c.stage === st);
-      return `<div class="column"><h3>${STAGE_LABEL[st]} <span class="count">${cards.length}</span></h3>` +
+      const cv = conv[st];
+      const convLine = cv && cv.pct !== null
+        ? `<span class="conv">${cv.entered} entered · ${cv.pct}% advanced</span>`
+        : (cv && cv.entered ? `<span class="conv">${cv.entered} entered</span>` : "");
+      return `<div class="column" data-stage="${st}"><h3>${STAGE_LABEL[st]} <span class="count">${cards.length}</span></h3>${convLine}` +
         cards.map(({ c, i }) => cardHtml(c, i, st)).join("") + `</div>`;
     }).join("") +
       (filtered.length !== p.length ? `<p class="hint">Showing ${filtered.length} of ${p.length} candidates (search active).</p>` : "");
+    // ---- drag and drop between columns ----
+    document.querySelectorAll(".card[data-dragidx]").forEach((card) => {
+      card.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", card.dataset.dragidx);
+        e.dataTransfer.effectAllowed = "move";
+        setTimeout(() => card.classList.add("dragging"), 0);
+      });
+      card.addEventListener("dragend", () => card.classList.remove("dragging"));
+    });
+    document.querySelectorAll(".column").forEach((col) => {
+      col.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        col.classList.add("droptarget");
+      });
+      col.addEventListener("dragleave", () => col.classList.remove("droptarget"));
+      col.addEventListener("drop", (e) => {
+        e.preventDefault();
+        col.classList.remove("droptarget");
+        dropCandidate(parseInt(e.dataTransfer.getData("text/plain"), 10), col.dataset.stage);
+      });
+    });
+    // ---- per-card buttons ----
     document.querySelectorAll("[data-mv]").forEach((b) => b.addEventListener("click", () => {
       const [i, dir] = b.dataset.mv.split("|");
       const pl = loadPipe(); const c = pl[+i];
@@ -233,35 +298,27 @@
       HW.stampStage(c, STAGES[Math.max(0, Math.min(STAGES.length - 1, idx + (dir === "fwd" ? 1 : -1)))]);
       savePipe(pl);
     }));
-    document.querySelectorAll("[data-note]").forEach((b) => b.addEventListener("click", () => {
-      const pl = loadPipe(); const c = pl[+b.dataset.note];
-      const v = prompt("Notes for " + c.name + ":", c.notes || "");
-      if (v === null) return;
-      c.notes = v.trim(); savePipe(pl);
-    }));
     document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => {
       const pl = loadPipe(); pl.splice(+b.dataset.del, 1); savePipe(pl);
     }));
-    document.querySelectorAll("[data-score]").forEach((b) => b.addEventListener("click", () => {
-      scoringId = +b.dataset.score; renderPipe();
-    }));
-    document.querySelectorAll("[data-scorecancel]").forEach((b) => b.addEventListener("click", () => {
-      scoringId = null; renderPipe();
-    }));
-    document.querySelectorAll("[data-scoresave]").forEach((b) => b.addEventListener("click", () => {
-      const i = +b.dataset.scoresave;
-      const pl = loadPipe();
-      const ratings = {};
-      b.closest(".card").querySelectorAll("[data-sc]").forEach((sel) => { ratings[sel.dataset.sc] = +sel.value; });
-      pl[i].interview = HW.scoreInterview(ratings);
-      scoringId = null;
-      savePipe(pl);
-    }));
     document.querySelectorAll("[data-reject]").forEach((b) => b.addEventListener("click", () => {
-      const pl = loadPipe(); HW.stampStage(pl[+b.dataset.reject], "rejected"); savePipe(pl);
+      const pl = loadPipe(); const c = pl[+b.dataset.reject];
+      const reason = prompt("Rejection reason (logged on the candidate record):", "");
+      if (reason === null) return;
+      if (reason.trim()) HW.addNoteToLog(c, "Rejected: " + reason.trim());
+      HW.stampStage(c, "rejected");
+      savePipe(pl);
     }));
     document.querySelectorAll("[data-reopen]").forEach((b) => b.addEventListener("click", () => {
       const pl = loadPipe(); HW.stampStage(pl[+b.dataset.reopen], "screening"); savePipe(pl);
+    }));
+    document.querySelectorAll("[data-profile]").forEach((b) => b.addEventListener("click", () => {
+      openProfile(+b.dataset.profile);
+    }));
+    document.querySelectorAll("[data-bulk]").forEach((box) => box.addEventListener("change", () => {
+      const i = +box.dataset.bulk;
+      bulkSel = box.checked ? [...new Set([...bulkSel, i])] : bulkSel.filter((x) => x !== i);
+      renderPipe();
     }));
     document.querySelectorAll("[data-cmp]").forEach((box) => box.addEventListener("change", () => {
       const i = +box.dataset.cmp;
@@ -302,6 +359,186 @@
     document.querySelectorAll("[data-viewon]").forEach((b) => b.addEventListener("click", () => {
       const c = loadPipe()[+b.dataset.viewon];
       if (window.__hwOnboard && c.onboardId) window.__hwOnboard.open(c.onboardId);
+    }));
+  }
+
+  // ---- upcoming interviews strip ----
+  function ivLabel(at) {
+    const d = new Date(at);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const day = new Date(d); day.setHours(0, 0, 0, 0);
+    const diff = Math.round((day - today) / 864e5);
+    const time = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    if (diff === 0) return "Today " + time;
+    if (diff === 1) return "Tomorrow " + time;
+    return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + " " + time;
+  }
+  function renderIvStrip() {
+    const out = $("ivOut");
+    const p = loadPipe();
+    const up = HW.upcomingInterviews(p, Date.now(), 6);
+    if (!up.length) { out.innerHTML = ""; out.classList.add("hidden"); return; }
+    out.classList.remove("hidden");
+    out.innerHTML = `<span class="iv-title">Upcoming interviews</span>` + up.map((u) =>
+      `<button class="iv-item" data-profile="${p.indexOf(u.candidate)}" title="Open dossier">
+         <strong>${escapeHtml(u.candidate.name)}</strong>
+         <span>${escapeHtml(u.candidate.role)}</span>
+         <span class="iv-when">${ivLabel(u.at)}</span>
+         <span class="iv-type">${escapeHtml(u.interview.type)}</span>
+       </button>`).join("");
+    out.querySelectorAll("[data-profile]").forEach((b) =>
+      b.addEventListener("click", () => openProfile(+b.dataset.profile, "interviews")));
+  }
+
+  // ---- candidate profile drawer ----
+  function openProfile(idx, anchor) {
+    const p = loadPipe();
+    if (!p[idx]) return;
+    profileIdx = idx;
+    renderDrawer(p, p[idx]);
+    $("drawerTitle").textContent = p[idx].name;
+    $("profileDrawer").classList.add("open");
+    $("drawerScrim").classList.add("open");
+    document.body.classList.add("drawer-open");
+    if (anchor) {
+      const t = $("drawerBody").querySelector('[data-anchor="' + anchor + '"]');
+      if (t) t.scrollIntoView();
+    }
+  }
+  function closeProfile() {
+    profileIdx = null;
+    $("profileDrawer").classList.remove("open");
+    $("drawerScrim").classList.remove("open");
+    document.body.classList.remove("drawer-open");
+  }
+  $("drawerClose").addEventListener("click", closeProfile);
+  $("drawerScrim").addEventListener("click", closeProfile);
+
+  function dialSvg(score, size) {
+    const circ = (2 * Math.PI * 34).toFixed(1);
+    const arc = ((Math.max(0, Math.min(100, score)) / 100) * 2 * Math.PI * 34).toFixed(1);
+    return `<svg viewBox="0 0 84 84" width="${size || 84}" height="${size || 84}" aria-hidden="true">
+      <circle cx="42" cy="42" r="34" class="dial-track"/>
+      <circle cx="42" cy="42" r="34" class="dial-fill" stroke-dasharray="${arc} ${circ}" transform="rotate(-90 42 42)"/>
+      <text x="42" y="50" text-anchor="middle" class="dial-num">${score}</text></svg>`;
+  }
+
+  function renderDrawer(p, c) {
+    const scored = typeof c.score === "number" && isFinite(c.score);
+    const verdictName = { strong: "Strong fit", maybe: "Maybe", no: "Not a fit", new: "Not scored yet" }[c.verdict] || c.verdict;
+    const evidence = (c.evidence || []).map((e) =>
+      `<li class="evi-${e.type === "match" ? "pos" : e.type === "miss" ? "neg" : "neu"}">${escapeHtml(e.text)}</li>`).join("");
+    const questions = (c.questions || []).map((q) => `<li>${escapeHtml(q)}</li>`).join("");
+    const scRows = HW.SCORE_CATS.map((cat) =>
+      `<label class="dsc-row"><span>${cat.label} <em>×${cat.weight}</em></span>
+         <select data-dsc="${cat.id}"><option value="">—</option>${[1, 2, 3, 4, 5].map((n) =>
+           `<option value="${n}"${c.interview && c.interview.ratings[cat.id] === n ? " selected" : ""}>${n}</option>`).join("")}
+       </select></label>`).join("");
+    const ivList = (c.interviews || []).slice().sort((a, b) => (HW.interviewAt(a) || 0) - (HW.interviewAt(b) || 0)).map((iv) =>
+      `<div class="iv-line"><div><strong>${escapeHtml(iv.date)}${iv.time ? " · " + escapeHtml(iv.time) : ""}</strong>
+         <span class="iv-type">${escapeHtml(iv.type)}</span>${iv.interviewer ? ` · with ${escapeHtml(iv.interviewer)}` : ""}</div>
+       ${iv.notes ? `<div class="small muted">${escapeHtml(iv.notes)}</div>` : ""}
+       <button class="ghost del" data-ivdel="${iv.id}">Cancel</button></div>`).join("") ||
+      `<p class="muted small">Nothing scheduled yet.</p>`;
+    const journal = (c.noteLog || []).slice().reverse().map((n) =>
+      `<div class="note-item"><div class="note-text">${escapeHtml(n.text)}</div>
+       <div class="note-meta"><span class="muted small">${new Date(n.at).toLocaleDateString()}</span></div></div>`).join("") ||
+      `<p class="muted small">No journal entries yet — log calls, impressions, anything worth remembering.</p>`;
+    const log = Array.isArray(c.stageLog) && c.stageLog.length ? c.stageLog : [{ stage: c.stage || "applied", at: c.ts || Date.now() }];
+    const journey = log.map((s, i) => {
+      const next = log[i + 1];
+      const days = next ? Math.max(0, Math.round((next.at - s.at) / 864e5)) : HW.daysInStage(c);
+      return `<div class="jstep"><span class="jpin"></span>
+        <div><strong>${escapeHtml(STAGE_LABEL[s.stage] || s.stage)}</strong>
+        <span class="muted small"> · ${new Date(s.at).toLocaleDateString()}${next ? ` · ${days}d` : ""}</span></div></div>`;
+    }).join("");
+    const days = HW.daysInStage(c);
+
+    $("drawerBody").innerHTML = `
+      <div class="dossier-head">
+        <div><div class="dossier-role">${escapeHtml(c.role || "—")}</div>
+        <div class="dossier-meta"><span class="stage-badge">${escapeHtml(STAGE_LABEL[c.stage] || c.stage)}</span>
+        <span class="due-chip">${days}d in stage</span>
+        ${c.onboardId ? `<span class="due-chip">onboarding started</span>` : ""}</div></div>
+      </div>
+
+      <section class="dossier-sect" data-anchor="fit">
+        <h4>Fit score</h4>
+        ${scored
+          ? `<div class="dossier-score verdict-${c.verdict}"><span class="dial">${dialSvg(c.score, 76)}</span>
+             <div><div class="verdict-line">${escapeHtml(verdictName)}</div>
+             ${c.missing && c.missing.length ? `<div class="small muted">Missing: ${escapeHtml(c.missing.join("; "))}</div>` : ""}</div></div>`
+          : `<p class="muted small">Not scored yet — paste their resume on the Screen resumes tab.</p>`}
+        ${evidence ? `<h5>Evidence</h5><ul class="evi compact">${evidence}</ul>` : ""}
+        ${questions ? `<h5>Interview questions</h5><ol class="dossier-q">${questions}</ol>` : ""}
+      </section>
+
+      <section class="dossier-sect" data-anchor="scorecard">
+        <h4>Interview scorecard</h4>
+        ${c.interview && c.interview.pct != null ? `<p class="iv-total">Current: <strong>${c.interview.pct}%</strong></p>` : ""}
+        ${scRows}
+        <button class="primary" data-scoresave2>Save scorecard</button>
+      </section>
+
+      <section class="dossier-sect" data-anchor="interviews">
+        <h4>Scheduled interviews</h4>
+        ${ivList}
+        <div class="iv-form">
+          <div class="row"><label>Date <input type="date" data-ivf="date"></label>
+          <label>Time <input type="time" data-ivf="time"></label></div>
+          <div class="row"><label>Type <select data-ivf="type">${HW.INTERVIEW_TYPES.map((t) => `<option>${t}</option>`).join("")}</select></label>
+          <label>Interviewer <input data-ivf="interviewer" placeholder="Who's meeting them"></label></div>
+          <label>Notes <input data-ivf="notes" placeholder="e.g. portfolio review, bring laptop"></label>
+          <button class="secondary" data-ivadd>Schedule interview</button>
+        </div>
+      </section>
+
+      <section class="dossier-sect" data-anchor="notes">
+        <h4>Notes journal</h4>
+        ${c.notes ? `<div class="pnote legacy-note">${escapeHtml(c.notes)} <button class="ghost del" data-note="${profileIdx}">Edit old note</button></div>` : ""}
+        ${journal}
+        <div class="note-add">
+          <textarea id="noteNew" rows="2" placeholder="Add a journal entry…"></textarea>
+          <button class="secondary" data-noteadd>Add note</button>
+        </div>
+      </section>
+
+      <section class="dossier-sect" data-anchor="journey">
+        <h4>Stage journey</h4>
+        <div class="journey-list">${journey}</div>
+      </section>`;
+
+    const body = $("drawerBody");
+    body.querySelector("[data-scoresave2]").addEventListener("click", () => {
+      const pl = loadPipe(); const cand = pl[profileIdx]; if (!cand) return;
+      const ratings = {};
+      body.querySelectorAll("[data-dsc]").forEach((sel) => { ratings[sel.dataset.dsc] = +sel.value; });
+      cand.interview = HW.scoreInterview(ratings);
+      savePipe(pl);
+    });
+    body.querySelector("[data-ivadd]").addEventListener("click", () => {
+      const vals = {};
+      body.querySelectorAll("[data-ivf]").forEach((inp) => { vals[inp.dataset.ivf] = inp.value; });
+      if (!vals.date) { alert("Pick a date for the interview."); return; }
+      const pl = loadPipe(); const cand = pl[profileIdx]; if (!cand) return;
+      if (!HW.scheduleInterview(cand, vals)) { alert("That date doesn't look right — use YYYY-MM-DD."); return; }
+      savePipe(pl);
+    });
+    body.querySelectorAll("[data-ivdel]").forEach((b) => b.addEventListener("click", () => {
+      const pl = loadPipe(); const cand = pl[profileIdx]; if (!cand) return;
+      if (confirm("Cancel this interview?")) { HW.removeInterview(cand, b.dataset.ivdel); savePipe(pl); }
+    }));
+    body.querySelector("[data-noteadd]").addEventListener("click", () => {
+      const ta = body.querySelector("#noteNew");
+      const pl = loadPipe(); const cand = pl[profileIdx]; if (!cand) return;
+      if (!HW.addNoteToLog(cand, ta.value)) { alert("Write the note first."); return; }
+      savePipe(pl);
+    });
+    body.querySelectorAll("[data-note]").forEach((b) => b.addEventListener("click", () => {
+      const pl = loadPipe(); const cand = pl[+b.dataset.note]; if (!cand) return;
+      const v = prompt("Notes for " + cand.name + ":", cand.notes || "");
+      if (v === null) return;
+      cand.notes = v.trim(); savePipe(pl);
     }));
   }
   // Start onboarding for a hired candidate: pick a role template, start date, buddy.
@@ -361,6 +598,26 @@
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   });
+  // ---- bulk actions ----
+  $("bulkApply").addEventListener("click", () => {
+    const pl = loadPipe(); const st = $("bulkStage").value;
+    bulkSel.forEach((i) => { if (pl[i]) HW.stampStage(pl[i], st); });
+    bulkSel = []; savePipe(pl);
+  });
+  $("bulkReject").addEventListener("click", () => {
+    if (!bulkSel.length || !confirm("Reject " + bulkSel.length + " candidate(s)?")) return;
+    const pl = loadPipe();
+    bulkSel.forEach((i) => { if (pl[i]) HW.stampStage(pl[i], "rejected"); });
+    bulkSel = []; savePipe(pl);
+  });
+  $("bulkDelete").addEventListener("click", () => {
+    if (!bulkSel.length || !confirm("Delete " + bulkSel.length + " candidate(s)?")) return;
+    const pl = loadPipe();
+    bulkSel.slice().sort((a, b) => b - a).forEach((i) => pl.splice(i, 1));
+    bulkSel = []; savePipe(pl);
+  });
+  $("bulkClear").addEventListener("click", () => { bulkSel = []; renderPipe(); });
+
   // ---- document modal: offer letters + rejection emails ----
   function openDoc(title, formHtml, render) {
     $("docTitle").textContent = title;
@@ -385,10 +642,11 @@
     if (e.target === $("docModal")) $("docModal").classList.add("hidden");
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") $("docModal").classList.add("hidden");
+    if (e.key === "Escape") { $("docModal").classList.add("hidden"); closeProfile(); }
   });
 
   renderPipe();
+  renderIvStrip();
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) =>

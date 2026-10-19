@@ -231,5 +231,51 @@ const csv=HW.pipelineToCSV(cands);
 if(!csv.includes('New Person')) process.exit(1);
 " && ok "flow11: quick-add null-score candidate keeps stats + CSV working" || bad "flow11 failed"
 
+
+
+# Flow 12: interview lifecycle — schedule from the profile, upcoming strip ordering
+node -e "
+const HW=require('./js/logic.js');
+const c={name:'Maria Santos',role:'Line Cook',score:85,verdict:'strong',stage:'interview'};
+HW.stampStage(c,'applied',1728259200000);
+HW.stampStage(c,'interview',1728259200000+864e5);
+const iv1=HW.scheduleInterview(c,{date:'2026-11-03',time:'10:30',type:'video',interviewer:'Pat'});
+const iv2=HW.scheduleInterview(c,{date:'2026-10-29',type:'phone'});
+if(!iv1||!iv2) process.exit(1);
+const now=new Date('2026-10-20T12:00:00').getTime();
+const up=HW.upcomingInterviews([c],now);
+if(up.length!==2||up[0].candidate.name!=='Maria Santos'||up[0].interview.date!=='2026-10-29') process.exit(1);
+HW.removeInterview(c,iv1.id);
+if(HW.upcomingInterviews([c],now).length!==1) process.exit(1);
+" && ok "flow12: interview schedule -> upcoming ordered -> cancel" || bad "flow12 failed"
+
+# Flow 13: drop-to-reject path — reason logged, stage stamped, conversion coherent
+node -e "
+const HW=require('./js/logic.js');
+const c={name:'Devon Carter',role:'Line Cook',score:55,verdict:'maybe'};
+HW.stampStage(c,'applied',1728259200000);
+HW.stampStage(c,'screening',1728259200000+864e5);
+HW.addNoteToLog(c,'Rejected: culture mismatch');
+HW.stampStage(c,'rejected',1728259200000+2*864e5);
+if(c.stage!=='rejected') process.exit(1);
+if(!c.noteLog.some(n=>/culture mismatch/.test(n.text))) process.exit(1);
+const conv=HW.stageConversion([c]);
+if(conv.applied.pct!==100||conv.screening.pct!==0) {console.error(conv);process.exit(1);}
+const csv=HW.pipelineToCSV([c]);
+if(!csv.includes('Devon Carter')||!/rejected/.test(csv)) process.exit(1);
+" && ok "flow13: reject with logged reason + conversion" || bad "flow13 failed"
+
+# Flow 14: dossier data shape — screener evidence carries onto the candidate record
+node -e "
+const HW=require('./js/logic.js');
+const r=HW.screenResume({role:'Line Cook',resumeText:'Maria Santos — line cook with 4 years experience at busy downtown restaurants. ServSafe certified in food safety with strong knife skills. Available weekends.',mustHaves:['food safety','weekend availability']});
+const c={name:'Maria Santos',role:'Line Cook',score:r.score,verdict:r.verdict,stage:'applied',ts:Date.now(),
+  evidence:r.evidence,questions:r.questions,matched:r.matched,missing:r.missing};
+HW.stampStage(c,'applied',c.ts);
+if(!Array.isArray(c.evidence)||!c.evidence.length) process.exit(1);
+if(!Array.isArray(c.questions)||c.questions.length!==5) process.exit(1);
+if(HW.stageConversion([c]).applied.entered!==1) process.exit(1);
+" && ok "flow14: screener evidence/questions ride the candidate record" || bad "flow14 failed"
+
 echo "---- e2e: $PASS passed, $FAIL failed ----"
 [ "$FAIL" -eq 0 ]
